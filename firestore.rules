@@ -1,0 +1,120 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthed() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isAuthed() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId == 'admin';
+    }
+    function userRole() {
+      return isAuthed() && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roleId
+        : null;
+    }
+    function canWriteCRM() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive']);
+    }
+
+    function isManagerOrAdmin() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager']);
+    }
+
+    // General CRM data (leads, customers, projects, etc.)
+    match /crm/main/{subCollection}/{docId} {
+      // Allow read for all authenticated users (filtering done in frontend)
+      allow read: if isAuthed();
+
+      // Write restrictions for tasks and customers
+      allow create: if canWriteCRM() && (
+        // Tasks: must assign to self unless manager/admin
+        (subCollection != 'crm_tasks' || request.resource.data.assignedTo == request.auth.uid || isManagerOrAdmin()) &&
+        // Customers: must set createdById to self
+        (subCollection != 'crm_customers' || request.resource.data.createdById == request.auth.uid)
+      );
+      allow update: if canWriteCRM() && (
+        // Tasks: must be assigned to task or manager/admin
+        (subCollection != 'crm_tasks' || resource.data.assignedTo == request.auth.uid || isManagerOrAdmin()) &&
+        // Customers: must be creator or manager/admin
+        (subCollection != 'crm_customers' || resource.data.createdById == request.auth.uid || isManagerOrAdmin())
+      );
+      allow delete: if canWriteCRM() && (
+        // Tasks: must be assigned to task or manager/admin
+        (subCollection != 'crm_tasks' || resource.data.assignedTo == request.auth.uid || isManagerOrAdmin()) &&
+        // Customers: must be creator or manager/admin
+        (subCollection != 'crm_customers' || resource.data.createdById == request.auth.uid || isManagerOrAdmin())
+      );
+    }
+
+    // Users collection - required for authentication and user management
+    match /users/{userId} {
+      // Any authenticated user can read user profiles (needed for displaying names, roles, etc.)
+      allow read: if isAuthed();
+      // Users can create their own document OR admins can create for others
+      allow create: if isAuthed() && (request.auth.uid == userId || isAdmin());
+      // Admins can update/delete users, users can update their own profile
+      allow update: if isAuthed() && (isAdmin() || request.auth.uid == userId);
+      allow delete: if isAdmin();
+    }
+
+    // Roles collection - for role-based access control
+    match /roles/{roleId} {
+      // Any authenticated user can read roles (needed for permissions checks)
+      allow read: if isAuthed();
+      // Only admins can create, update, or delete roles
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Calendar collections
+    match /calendars/{calendarId} {
+      // Users can read calendars they own or are shared with
+      allow read: if isAuthed();
+      // Users can create their own calendars
+      allow create: if isAuthed() && request.resource.data.ownerId == request.auth.uid;
+      // Users can update/delete their own calendars
+      allow update, delete: if isAuthed() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /calendar_shares/{shareId} {
+      // Users can read shares they're involved in
+      allow read: if isAuthed();
+      // Users can create shares for calendars they own
+      allow create: if isAuthed() && request.resource.data.ownerId == request.auth.uid;
+      // Owners can update/delete, or shared users can update their acceptance status
+      allow update: if isAuthed() && (resource.data.ownerId == request.auth.uid || resource.data.sharedWithId == request.auth.uid);
+      allow delete: if isAuthed() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /public_booking_pages/{pageId} {
+      // Anyone can read active booking pages (for public access)
+      allow read: if true;
+      // Only owners can create/update/delete their booking pages
+      allow create: if isAuthed() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isAuthed() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /bookings/{bookingId} {
+      // Public can create bookings, owners can read/update
+      allow create: if true;
+      allow read, update: if isAuthed();
+      allow delete: if isAuthed() && userRole() == 'admin';
+    }
+
+    match /user_schedules/{scheduleId} {
+      // Users can read all schedules (for availability finder)
+      allow read: if isAuthed();
+      // Users can only write their own schedule
+      allow create: if isAuthed() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthed() && resource.data.userId == request.auth.uid;
+    }
+
+    // Fallback deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
