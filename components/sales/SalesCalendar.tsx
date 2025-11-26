@@ -18,7 +18,8 @@ const SalesCalendar: React.FC = () => {
     addCalendar, updateCalendar, deleteCalendar,
     addCalendarEntry, updateCalendarEntry, deleteCalendarEntry,
     shareCalendar, deleteCalendarShare, updateCalendarShare,
-    getUserSchedule
+    getUserSchedule,
+    leads
   } = useCRM();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -26,6 +27,7 @@ const SalesCalendar: React.FC = () => {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [selectedCalendarId, setSelectedCalendarId] = useState<string | null>(null);
   const [visibleCalendarIds, setVisibleCalendarIds] = useState<Set<string>>(new Set(['default']));
 
@@ -368,11 +370,21 @@ const SalesCalendar: React.FC = () => {
     setIsEventModalOpen(false);
   };
 
-  const handleDeleteEvent = async () => {
-    if (selectedEvent && window.confirm('Are you sure you want to delete this event?')) {
-      await deleteCalendarEntry(selectedEvent.id);
-      setIsEventModalOpen(false);
-    }
+  const handleDeleteEvent = () => {
+    // Open confirmation modal instead of browser confirm
+    setIsDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedEvent) return;
+
+    await deleteCalendarEntry(selectedEvent.id);
+    setIsDeleteConfirmOpen(false);
+    setIsEventModalOpen(false);
+  };
+
+  const cancelDelete = () => {
+    setIsDeleteConfirmOpen(false);
   };
 
   const handleCreateCalendar = async () => {
@@ -1169,6 +1181,70 @@ const SalesCalendar: React.FC = () => {
               Share Calendar
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={isDeleteConfirmOpen}
+        onClose={cancelDelete}
+        title="Delete Task"
+      >
+        <div className="space-y-4">
+          {selectedEvent && (() => {
+            const linkedLead = selectedEvent.leadId ? leads.find(l => l.id === selectedEvent.leadId) : null;
+
+            return (
+              <>
+                <p className="text-sm text-slate-700">
+                  Are you sure you want to delete this task?
+                </p>
+
+                {linkedLead ? (
+                  // Lead-based task details
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <AlertCircleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 space-y-2">
+                        <div>
+                          <span className="text-xs font-semibold text-slate-500 uppercase block mb-1">Task</span>
+                          <span className="text-sm font-medium text-slate-900">{selectedEvent.title}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-slate-500 uppercase block mb-1">Lead</span>
+                          <span className="text-sm font-medium text-slate-900">{linkedLead.title}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs font-semibold text-slate-500 uppercase block mb-1">Customer</span>
+                          <span className="text-sm font-medium text-slate-900">{linkedLead.customerName}</span>
+                        </div>
+                        <p className="text-xs text-amber-700 pt-2 border-t border-amber-200">
+                          This task was created from the CRM Lead Details screen and is linked to the lead.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Regular event
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-500 uppercase block mb-1">Event</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedEvent.title}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="ghost" onClick={cancelDelete}>
+                    Cancel
+                  </Button>
+                  <Button onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                    Delete
+                  </Button>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </Modal>
     </div>

@@ -394,10 +394,31 @@ const SalesLeads: React.FC = () => {
 
   const handleSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedLead || !scheduleForm.title.trim() || !hasPermission(Permission.MANAGE_CRM_CALENDAR)) return;
+
+    // Validation
+    if (!selectedLead) {
+      console.error('No lead selected');
+      alert('Please select a lead first.');
+      return;
+    }
+
+    if (!scheduleForm.title.trim()) {
+      alert('Please enter a task title.');
+      return;
+    }
+
+    if (!hasPermission(Permission.MANAGE_CRM_CALENDAR)) {
+      alert('You do not have permission to create tasks.');
+      return;
+    }
+
     if (isSavingTask) return; // Prevent double submission
 
     setIsSavingTask(true);
+    console.log('=== Starting task creation process ===');
+    console.log('Form data:', scheduleForm);
+    console.log('Selected lead:', selectedLead);
+
     const isoDate = new Date(scheduleForm.dateTime).toISOString();
 
     try {
@@ -406,7 +427,8 @@ const SalesLeads: React.FC = () => {
         ? `${scheduleForm.description.trim()}\n\nLead: ${selectedLead.title} • ${selectedLead.customerName}`
         : `Lead: ${selectedLead.title} • ${selectedLead.customerName}`;
 
-      // Create calendar entry
+      // Step 1: Create calendar entry
+      console.log('Step 1: Creating calendar entry...');
       await addCalendarEntry({
         title: scheduleForm.title.trim(),
         date: isoDate,
@@ -417,44 +439,60 @@ const SalesLeads: React.FC = () => {
         ownerId: currentUser?.id,
         calendarId: 'default',
       });
+      console.log('✓ Calendar entry created');
 
-      // IMPORTANT: Also create a task in the main CRM Task module
-      // This ensures the task is visible in the main Task module with full details
-      await addTask({
+      // Step 2: Create task in main CRM Task module
+      console.log('Step 2: Creating CRM task...');
+      const taskData = {
         id: `lead-task-${Date.now()}`,
         title: scheduleForm.title.trim(),
         description: scheduleForm.description.trim() || undefined,
         assignedTo: currentUser?.id || currentUser?.email || 'System',
-        status: 'To Do',
-        priority: 'Medium',
+        status: 'To Do' as const,
+        priority: 'Medium' as const,
         dueDate: isoDate.split('T')[0], // Extract date only
         // Origin and lead association tracking
-        createdFrom: 'lead_calendar',
+        createdFrom: 'lead_calendar' as const,
         leadId: selectedLead.id,
         leadTitle: selectedLead.title,
         leadCustomerName: selectedLead.customerName,
-      });
+      };
+      console.log('Task data to save:', taskData);
 
-      // Add to lead timeline
+      await addTask(taskData);
+      console.log('✓ CRM task created');
+
+      // Step 3: Add to lead timeline
+      console.log('Step 3: Adding to lead timeline...');
       await addLeadTimelineEvent(selectedLead.id, {
         text: `Task scheduled: ${scheduleForm.title.trim()}`,
         type: 'task',
         user: currentUser?.name || 'System',
         date: isoDate,
       });
+      console.log('✓ Timeline updated');
 
-      // Reset form to initial state
+      // Success! Reset form
       setScheduleForm({
         title: '',
         description: '',
         dateTime: new Date().toISOString().slice(0, 16),
       });
 
-      // Success feedback
-      console.log('Task saved successfully');
+      console.log('=== Task creation completed successfully ===');
+      alert('Task saved successfully!');
     } catch (error) {
-      console.error('Error scheduling calendar task:', error);
-      alert('Failed to save task. Please try again.');
+      console.error('=== Error in task creation process ===');
+      console.error('Error details:', error);
+
+      let errorMessage = 'Failed to save task. ';
+      if (error instanceof Error) {
+        errorMessage += error.message;
+      } else {
+        errorMessage += 'Please check console for details.';
+      }
+
+      alert(errorMessage);
     } finally {
       setIsSavingTask(false);
     }

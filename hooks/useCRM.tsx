@@ -5,7 +5,7 @@ import {
   Calendar, CalendarShare, PublicBookingPage, Booking, UserSchedule, SharePermission, QuotationRequest
 } from '../types';
 import { useAuth } from './useAuth';
-import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Initial Mock Data
@@ -201,43 +201,10 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const hydrateFromFirestore = useCallback(async () => {
     try {
+      // Seed initial data if collections are empty (one-time check)
       await seedCollection();
-      const [leadSnap, custSnap, projSnap, taskSnap, calSnap, quotSnap, invSnap, quotReqSnap] = await Promise.all([
-        getDocs(crmSub('crm_leads')),
-        getDocs(crmSub('crm_customers')),
-        getDocs(crmSub('crm_projects')),
-        getDocs(crmSub('crm_tasks')),
-        getDocs(crmSub('crm_calendar')),
-        getDocs(crmSub('crm_quotations')),
-        getDocs(crmSub('crm_invoices')),
-        getDocs(crmSub('crm_quotation_requests')),
-      ]);
-
-      setLeads(leadSnap.docs.map(d => ({ id: d.id, ...(d.data() as Lead) })));
-      setCustomers(custSnap.docs.map(d => ({ id: d.id, ...(d.data() as Customer) })));
-      setProjects(projSnap.docs.map(d => ({ id: d.id, ...(d.data() as Project) })));
-      setTasks(taskSnap.docs.map(d => ({ id: d.id, ...(d.data() as Task) })));
-      setCalendarEntries(calSnap.docs.map(d => ({ id: d.id, ...(d.data() as CalendarEvent) })));
-      setQuotations(quotSnap.docs.map(d => ({ id: d.id, ...(d.data() as Quotation) })));
-      setInvoices(invSnap.docs.map(d => ({ id: d.id, ...(d.data() as Invoice) })));
-      setQuotationRequests(quotReqSnap.docs.map(d => ({ id: d.id, ...(d.data() as QuotationRequest) })));
-
-      // Load new calendar collections
-      const [calendarsSnap, sharesSnap, bookingPagesSnap, bookingsSnap, schedulesSnap] = await Promise.all([
-        getDocs(collection(db, 'calendars')),
-        getDocs(collection(db, 'calendar_shares')),
-        getDocs(collection(db, 'public_booking_pages')),
-        getDocs(collection(db, 'bookings')),
-        getDocs(collection(db, 'user_schedules')),
-      ]);
-
-      setCalendars(calendarsSnap.docs.map(d => ({ id: d.id, ...(d.data() as Calendar) })));
-      setCalendarShares(sharesSnap.docs.map(d => ({ id: d.id, ...(d.data() as CalendarShare) })));
-      setPublicBookingPages(bookingPagesSnap.docs.map(d => ({ id: d.id, ...(d.data() as PublicBookingPage) })));
-      setBookings(bookingsSnap.docs.map(d => ({ id: d.id, ...(d.data() as Booking) })));
-      setUserSchedules(schedulesSnap.docs.map(d => ({ id: d.id, ...(d.data() as UserSchedule) })));
     } catch (err) {
-      console.error('Error hydrating CRM data', err);
+      console.error('Error seeding CRM data', err);
     }
   }, [seedCollection]);
 
@@ -258,7 +225,89 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setUserSchedules([]);
       return;
     }
+
+    // Seed initial data
     hydrateFromFirestore();
+
+    // CRITICAL FIX: Set up real-time listeners for all CRM collections
+    // This ensures all users see updates immediately across all roles
+    console.log('Setting up real-time Firestore listeners for CRM data...');
+
+    const unsubscribeLeads = onSnapshot(crmSub('crm_leads'), (snapshot) => {
+      const leadsData = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Lead) }));
+      setLeads(leadsData);
+      console.log('Real-time update: Leads', leadsData.length);
+    }, (error) => {
+      console.error('Error in leads listener:', error);
+    });
+
+    const unsubscribeCustomers = onSnapshot(crmSub('crm_customers'), (snapshot) => {
+      setCustomers(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Customer) })));
+    });
+
+    const unsubscribeProjects = onSnapshot(crmSub('crm_projects'), (snapshot) => {
+      setProjects(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Project) })));
+    });
+
+    const unsubscribeTasks = onSnapshot(crmSub('crm_tasks'), (snapshot) => {
+      setTasks(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Task) })));
+    });
+
+    const unsubscribeCalendar = onSnapshot(crmSub('crm_calendar'), (snapshot) => {
+      setCalendarEntries(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as CalendarEvent) })));
+    });
+
+    const unsubscribeQuotations = onSnapshot(crmSub('crm_quotations'), (snapshot) => {
+      setQuotations(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Quotation) })));
+    });
+
+    const unsubscribeInvoices = onSnapshot(crmSub('crm_invoices'), (snapshot) => {
+      setInvoices(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Invoice) })));
+    });
+
+    const unsubscribeQuotationRequests = onSnapshot(crmSub('crm_quotation_requests'), (snapshot) => {
+      setQuotationRequests(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as QuotationRequest) })));
+    });
+
+    // Calendar feature collections
+    const unsubscribeCalendars = onSnapshot(collection(db, 'calendars'), (snapshot) => {
+      setCalendars(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Calendar) })));
+    });
+
+    const unsubscribeCalendarShares = onSnapshot(collection(db, 'calendar_shares'), (snapshot) => {
+      setCalendarShares(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as CalendarShare) })));
+    });
+
+    const unsubscribeBookingPages = onSnapshot(collection(db, 'public_booking_pages'), (snapshot) => {
+      setPublicBookingPages(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as PublicBookingPage) })));
+    });
+
+    const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
+      setBookings(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Booking) })));
+    });
+
+    const unsubscribeSchedules = onSnapshot(collection(db, 'user_schedules'), (snapshot) => {
+      setUserSchedules(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as UserSchedule) })));
+    });
+
+    // Cleanup function to unsubscribe from all listeners when component unmounts
+    // or when currentUser changes
+    return () => {
+      console.log('Cleaning up real-time Firestore listeners...');
+      unsubscribeLeads();
+      unsubscribeCustomers();
+      unsubscribeProjects();
+      unsubscribeTasks();
+      unsubscribeCalendar();
+      unsubscribeQuotations();
+      unsubscribeInvoices();
+      unsubscribeQuotationRequests();
+      unsubscribeCalendars();
+      unsubscribeCalendarShares();
+      unsubscribeBookingPages();
+      unsubscribeBookings();
+      unsubscribeSchedules();
+    };
   }, [currentUser, hydrateFromFirestore]);
 
   const addCalendarEntry = async (entry: Omit<CalendarEvent, 'id'>) => {
@@ -461,8 +510,36 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // --- TASK ACTIONS ---
 
   const addTask = async (task: Task) => {
-      setTasks(prev => [task, ...prev]);
-      await setDoc(doc(crmSub('crm_tasks'), task.id), task);
+      try {
+          console.log('addTask called with:', task);
+
+          // Validate required fields
+          if (!task.id || !task.title || !task.assignedTo || !task.status || !task.priority || !task.dueDate) {
+              const error = 'Missing required task fields';
+              console.error(error, { task });
+              throw new Error(error);
+          }
+
+          // Update local state optimistically
+          setTasks(prev => [task, ...prev]);
+          console.log('Task added to local state');
+
+          // Filter out undefined values (Firestore doesn't allow undefined)
+          const taskData = Object.fromEntries(
+              Object.entries(task).filter(([_, value]) => value !== undefined)
+          );
+          console.log('Filtered task data for Firestore:', taskData);
+
+          // Write to Firestore
+          const taskRef = doc(crmSub('crm_tasks'), task.id);
+          await setDoc(taskRef, taskData);
+          console.log('Task saved to Firestore successfully:', task.id);
+      } catch (error) {
+          console.error('Error in addTask:', error);
+          // Revert optimistic update on failure
+          setTasks(prev => prev.filter(t => t.id !== task.id));
+          throw error; // Re-throw to let caller handle it
+      }
   };
 
   const updateTask = async (id: string, data: Partial<Task>) => {
