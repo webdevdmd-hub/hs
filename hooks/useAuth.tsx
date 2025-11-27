@@ -1,15 +1,15 @@
 
 import React, { createContext, useState, useContext, useMemo, useCallback, useEffect } from 'react';
 import { User, Role, Permission } from '../types';
-import { auth, db, firebaseConfig } from '../firebase';
+import { auth, db, firebaseConfig, functions } from '../firebase';
 import { initializeApp, deleteApp, getApps, getApp } from 'firebase/app';
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut, 
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
   onAuthStateChanged,
   getAuth,
-  User as FirebaseUser 
+  User as FirebaseUser
 } from 'firebase/auth';
 import {
   doc,
@@ -21,6 +21,7 @@ import {
   deleteDoc,
   onSnapshot
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 
 // --- MOCK ROLES (Keeping roles hardcoded for simplicity, but permissions could also be in DB) ---
 const ALL_PERMISSIONS = Object.values(Permission);
@@ -421,18 +422,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const deleteUser = async (userId: string) => {
     try {
-      // Delete user document from Firestore
-      // Note: This deletes the user profile but not the Firebase Auth account.
-      // The Auth account will remain but be inaccessible without a Firestore profile.
-      // To completely remove the Auth account, you'll need to use Firebase Console
-      // or set up a Cloud Function with proper CORS configuration.
-      await deleteDoc(doc(db, "users", userId));
+      // Call Cloud Function to delete both Firebase Auth account and Firestore document
+      const deleteAuthUser = httpsCallable(functions, 'deleteAuthUser');
+      const result = await deleteAuthUser({ userId });
 
-      console.log(`User ${userId} deleted from Firestore successfully`);
-      // Real-time listener will automatically update the users list
+      console.log(`User ${userId} deleted successfully:`, result.data);
+      // Real-time listener will automatically update the users list after Firestore deletion
     } catch (error: any) {
       console.error("Error deleting user:", error);
-      throw error;
+
+      // Provide user-friendly error messages
+      if (error.code === 'functions/unauthenticated') {
+        throw new Error('You must be logged in to delete users.');
+      } else if (error.code === 'functions/permission-denied') {
+        throw new Error('Only administrators can delete users.');
+      } else if (error.code === 'functions/failed-precondition') {
+        throw new Error('Cannot delete your own account.');
+      } else if (error.code === 'functions/not-found') {
+        throw new Error('Cloud Function not deployed. Please deploy Firebase Functions first.');
+      } else {
+        throw new Error(error.message || 'Failed to delete user. Please try again.');
+      }
     }
   };
 

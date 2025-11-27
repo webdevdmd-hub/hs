@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getFunctions } from 'firebase/functions';
 
 // IMPORTANT: Replace with your actual Firebase project configuration
 // You can find this in your project's settings on the Firebase console.
@@ -21,3 +22,6 @@ export const db = getFirestore(app);
 
 // Get Auth instance
 export const auth = getAuth(app);
+
+// Get Functions instance
+export const functions = getFunctions(app);
