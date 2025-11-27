@@ -87,29 +87,22 @@ const SalesTasks: React.FC = () => {
     const canViewAssignedTo = hasPermission(Permission.VIEW_ASSIGNED_TO);
 
     // Helper function to check if a task is "old"
+    // "Old tasks" are defined as COMPLETED tasks that were finished more than 7 days ago
+    // Uncompleted tasks are ALWAYS visible, regardless of due date
     const isOldTask = (task: Task): boolean => {
+        // Only consider completed tasks as potentially "old"
+        if (task.status !== 'Done' || !task.completedAt) {
+            return false; // Uncompleted tasks are never considered "old"
+        }
+
+        // Check if completed more than 7 days ago
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const dueDate = new Date(task.dueDate);
-        dueDate.setHours(0, 0, 0, 0);
+        const completedDate = new Date(task.completedAt);
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
 
-        // Old task criteria:
-        // 1. Past due AND not completed (incomplete overdue tasks)
-        if (dueDate < today && task.status !== 'Done') {
-            return true;
-        }
-
-        // 2. Completed more than 7 days ago
-        if (task.status === 'Done' && task.completedAt) {
-            const completedDate = new Date(task.completedAt);
-            const sevenDaysAgo = new Date(today);
-            sevenDaysAgo.setDate(today.getDate() - 7);
-            if (completedDate < sevenDaysAgo) {
-                return true;
-            }
-        }
-
-        return false;
+        return completedDate < sevenDaysAgo;
     };
 
     const filteredTasks = useMemo(() => {

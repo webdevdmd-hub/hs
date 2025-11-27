@@ -106,28 +106,33 @@ const SalesLeads: React.FC = () => {
     const userRole = currentUser ? getRoleForUser(currentUser) : null;
     const isSalesExecutive = userRole?.id === 'sales_executive';
 
-    return leads.filter(lead => {
-      // Permission Filter:
-      // Users with global visibility (Admin, Sales Manager, Assistant Sales Manager) see all leads.
-      // Sales Executives see only leads created by them OR assigned to them.
-      if (!hasGlobalVisibility && isSalesExecutive) {
-          if (lead.createdById !== currentUser?.id && lead.assignedTo !== currentUser?.id) {
-              return false;
-          }
-      }
-
-      // User Filter (only for privileged roles with global visibility)
-      if (hasGlobalVisibility && userFilter !== 'All') {
-        if (lead.assignedTo !== userFilter) {
-          return false;
+    return leads
+      .filter(lead => {
+        // Permission Filter:
+        // Users with global visibility (Admin, Sales Manager, Assistant Sales Manager) see all leads.
+        // Sales Executives see only leads created by them OR assigned to them.
+        if (!hasGlobalVisibility && isSalesExecutive) {
+            if (lead.createdById !== currentUser?.id && lead.assignedTo !== currentUser?.id) {
+                return false;
+            }
         }
-      }
 
-      // Standard Filters
-      const matchesStatus = statusFilter === 'All' || lead.status === statusFilter;
-      const matchesDate = !dateFilter || new Date(lead.createdAt) >= new Date(dateFilter);
-      return matchesStatus && matchesDate;
-    });
+        // User Filter (only for privileged roles with global visibility)
+        if (hasGlobalVisibility && userFilter !== 'All') {
+          if (lead.assignedTo !== userFilter) {
+            return false;
+          }
+        }
+
+        // Standard Filters
+        const matchesStatus = statusFilter === 'All' || lead.status === statusFilter;
+        const matchesDate = !dateFilter || new Date(lead.createdAt) >= new Date(dateFilter);
+        return matchesStatus && matchesDate;
+      })
+      .sort((a, b) => {
+        // Sort by creation date descending (newest first)
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
   }, [statusFilter, dateFilter, userFilter, leads, currentUser, getRoleForUser, hasGlobalVisibility]);
 
   const getStatusStyles = (status: LeadStatus) => {

@@ -107,7 +107,8 @@ const CustomerList: React.FC = () => {
                 phone: formData.phone,
                 status: formData.status,
                 source: formData.source,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                createdById: currentUser?.id || 'system'
             };
             addCustomer(newCustomer);
         }

@@ -37,48 +37,63 @@ const AppContent: React.FC = () => {
     switch (currentView) {
       case 'dashboard':
         return hasPermission(Permission.VIEW_SALES_DASHBOARD) ? <SalesDashboard /> : <Placeholder title="Dashboard" />;
+
+      // Admin Routes - Strict Permission Enforcement
       case 'admin_users':
-        return <AdminDashboard tab="users" />;
+        return hasPermission(Permission.VIEW_USERS) ? <AdminDashboard tab="users" /> : <Placeholder title="User Management" />;
       case 'admin_roles':
-        return <AdminDashboard tab="roles" />;
+        return hasPermission(Permission.VIEW_ROLES) ? <AdminDashboard tab="roles" /> : <Placeholder title="Role Management" />;
+
+      // CRM Routes - Strict Permission Enforcement
       case 'sales_leads':
-        return <SalesLeads />;
+        return hasPermission(Permission.VIEW_LEADS) ? <SalesLeads /> : <Placeholder title="Leads" />;
       case 'sales_projects':
-        return <SalesProjects />;
+        return hasPermission(Permission.MANAGE_PROJECTS) ? <SalesProjects /> : <Placeholder title="Projects" />;
       case 'sales_tasks':
-        return <SalesTasks />;
+        return hasPermission(Permission.VIEW_TASKS) ? <SalesTasks /> : <Placeholder title="Tasks" />;
       case 'sales_quotations':
         return hasPermission(Permission.VIEW_QUOTATIONS) ? <SalesQuotations /> : <Placeholder title="Quotations" />;
       case 'sales_invoices':
         return hasPermission(Permission.VIEW_INVOICES) ? <SalesInvoices /> : <Placeholder title="Invoices" />;
+
+      // Customer Routes - Strict Permission Enforcement
       case 'customers':
-        return <CustomerList />;
+        return hasPermission(Permission.VIEW_CUSTOMERS) ? <CustomerList /> : <Placeholder title="Customers" />;
+
+      // CRM Module Views - Strict Permission Enforcement
       case 'crm_dashboard':
         return hasPermission(Permission.VIEW_SALES_DASHBOARD) ? <SalesDashboard /> : <Placeholder title="CRM Dashboard" />;
       case 'crm_calendar':
         return hasPermission(Permission.MANAGE_CRM_CALENDAR) ? <SalesCalendar /> : <Placeholder title="CRM Calendar" />;
       case 'crm_reports':
         return hasPermission(Permission.VIEW_CRM_REPORTS) ? <SalesReports /> : <Placeholder title="CRM Reports" />;
+
+      // Sales Module Views - Strict Permission Enforcement
       case 'sales_dashboard':
         return hasPermission(Permission.VIEW_SALES_DASHBOARD) ? <SalesDashboard /> : <Placeholder title="Sales" />;
+
+      // Other Module Placeholders - Strict Permission Enforcement
       case 'accounts':
-        return <Placeholder title="Accounts" />;
+        return hasPermission(Permission.VIEW_ACCOUNTS) ? <Placeholder title="Accounts" /> : <Placeholder title="Accounts (No Access)" />;
       case 'store':
-        return <Placeholder title="Store" />;
+        return hasPermission(Permission.VIEW_STORE) ? <Placeholder title="Store" /> : <Placeholder title="Store (No Access)" />;
       case 'procurement':
-        return <Placeholder title="Procurement" />;
+        return hasPermission(Permission.VIEW_PROCUREMENT) ? <Placeholder title="Procurement" /> : <Placeholder title="Procurement (No Access)" />;
       case 'logistics':
-        return <Placeholder title="Logistics" />;
+        return hasPermission(Permission.VIEW_LOGISTICS) ? <Placeholder title="Logistics" /> : <Placeholder title="Logistics (No Access)" />;
       case 'marketing':
-        return <Placeholder title="Marketing" />;
+        return hasPermission(Permission.VIEW_MARKETING) ? <Placeholder title="Marketing" /> : <Placeholder title="Marketing (No Access)" />;
       case 'compliance':
-        return <Placeholder title="Compliance & Documentation" />;
+        return hasPermission(Permission.VIEW_COMPLIANCE) ? <Placeholder title="Compliance & Documentation" /> : <Placeholder title="Compliance (No Access)" />;
       case 'fleet':
-        return <Placeholder title="Fleet Management" />;
+        return hasPermission(Permission.VIEW_FLEET) ? <Placeholder title="Fleet Management" /> : <Placeholder title="Fleet (No Access)" />;
+
+      // Always Accessible - No Permission Required
       case 'profile':
         return <Placeholder title="My Profile" />;
       case 'settings':
         return <Placeholder title="Settings" />;
+
       default:
         return <Placeholder title="Dashboard" />;
     }
