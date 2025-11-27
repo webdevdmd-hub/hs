@@ -13,6 +13,7 @@ import SalesCalendar from './components/sales/SalesCalendar';
 import SalesQuotations from './components/sales/SalesQuotations';
 import SalesInvoices from './components/sales/SalesInvoices';
 import SalesReports from './components/sales/SalesReports';
+import QuotationRequests from './components/sales/QuotationRequests';
 import CustomerList from './components/customers/CustomerList';
 import Placeholder from './components/shared/Placeholder';
 import { User, Role, Permission } from './types';
@@ -55,6 +56,8 @@ const AppContent: React.FC = () => {
         return hasPermission(Permission.VIEW_QUOTATIONS) ? <SalesQuotations /> : <Placeholder title="Quotations" />;
       case 'sales_invoices':
         return hasPermission(Permission.VIEW_INVOICES) ? <SalesInvoices /> : <Placeholder title="Invoices" />;
+      case 'quotation_requests':
+        return hasPermission(Permission.VIEW_QUOTATION_REQUESTS) ? <QuotationRequests /> : <Placeholder title="Quotation Requests" />;
 
       // Customer Routes - Strict Permission Enforcement
       case 'customers':

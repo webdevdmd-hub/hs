@@ -32,6 +32,7 @@ const MOCK_ROLES: Role[] = [
     Permission.VIEW_SALES_DASHBOARD,
     // Full Lead Access
     Permission.VIEW_LEADS, Permission.CREATE_LEADS, Permission.EDIT_LEADS, Permission.DELETE_LEADS, Permission.ASSIGN_LEADS,
+    Permission.CONVERT_LEADS_TO_CUSTOMERS,
     Permission.MANAGE_PROJECTS,
     // Full Task Access
     Permission.VIEW_TASKS, Permission.CREATE_TASKS, Permission.EDIT_TASKS, Permission.DELETE_TASKS,
@@ -44,12 +45,19 @@ const MOCK_ROLES: Role[] = [
     Permission.MANAGE_PUBLIC_BOOKING, Permission.MANAGE_EVENT_REMINDERS,
     Permission.USE_AVAILABILITY_FINDER, Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
     Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS,
+    // Quotation Request Management
+    Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
+    Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
+    // Quotations and Invoices
+    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS,
+    Permission.VIEW_INVOICES,
     Permission.VIEW_ACCOUNTS,
   ]},
   { id: 'assistant_sales_manager', name: 'Assistant Sales Manager', permissions: [
     Permission.VIEW_SALES_DASHBOARD,
     // Full Lead Access (same as Sales Manager)
     Permission.VIEW_LEADS, Permission.CREATE_LEADS, Permission.EDIT_LEADS, Permission.DELETE_LEADS, Permission.ASSIGN_LEADS,
+    Permission.CONVERT_LEADS_TO_CUSTOMERS,
     Permission.MANAGE_PROJECTS,
     // Full Task Access
     Permission.VIEW_TASKS, Permission.CREATE_TASKS, Permission.EDIT_TASKS, Permission.DELETE_TASKS,
@@ -62,12 +70,19 @@ const MOCK_ROLES: Role[] = [
     Permission.MANAGE_PUBLIC_BOOKING, Permission.MANAGE_EVENT_REMINDERS,
     Permission.USE_AVAILABILITY_FINDER, Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
     Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS,
+    // Quotation Request Management
+    Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
+    Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
+    // Quotations and Invoices
+    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS,
+    Permission.VIEW_INVOICES,
     Permission.VIEW_ACCOUNTS,
   ]},
   { id: 'sales_executive', name: 'Sales Person', permissions: [
     Permission.VIEW_SALES_DASHBOARD,
     // Limited Lead Access (No Delete, No Global Assign usually)
     Permission.VIEW_LEADS, Permission.CREATE_LEADS, Permission.EDIT_LEADS,
+    Permission.CONVERT_LEADS_TO_CUSTOMERS,
     // Limited Task Access (No Delete)
     Permission.VIEW_TASKS, Permission.CREATE_TASKS, Permission.EDIT_TASKS,
     Permission.VIEW_ASSIGNED_TO,
@@ -79,6 +94,27 @@ const MOCK_ROLES: Role[] = [
     Permission.MANAGE_EVENT_REMINDERS, Permission.USE_AVAILABILITY_FINDER,
     Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
     Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS,
+    // Quotation Request (can create but not assign/process)
+    Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
+    Permission.VIEW_QUOTATIONS,
+  ]},
+  { id: 'sales_coordinator', name: 'Sales Coordinator', permissions: [
+    Permission.VIEW_SALES_DASHBOARD,
+    // View leads (to understand context)
+    Permission.VIEW_LEADS,
+    // Full Task Access (to complete their assigned quotation tasks)
+    Permission.VIEW_TASKS, Permission.CREATE_TASKS, Permission.EDIT_TASKS,
+    Permission.VIEW_ASSIGNED_TO,
+    // Calendar permissions
+    Permission.MANAGE_CRM_CALENDAR,
+    Permission.VIEW_CALENDARS, Permission.CREATE_CALENDARS,
+    Permission.MANAGE_EVENT_REMINDERS, Permission.USE_AVAILABILITY_FINDER,
+    Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
+    Permission.VIEW_CUSTOMERS,
+    // Quotation Request Processing (assigned requests only)
+    Permission.VIEW_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
+    // Quotation Management (can create and edit quotations)
+    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS,
   ]},
   { id: 'accountant_head', name: 'Accountant Head', permissions: [
     Permission.VIEW_ACCOUNTS, Permission.VIEW_CUSTOMERS,
@@ -258,7 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await setDoc(doc(db, "roles", role.id), {
                   name: role.name,
                   permissions: role.permissions,
-                  isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'accountant_head'].includes(role.id)
+                  isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(role.id)
                 });
               }
               console.log("Default roles seeded successfully");
@@ -504,7 +540,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setDoc(roleRef, {
         name: currentRole.name,
         permissions: uniquePermissions,
-        isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'accountant_head'].includes(roleId)
+        isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(roleId)
       }, { merge: true });
 
       // Real-time listener will sync any discrepancies

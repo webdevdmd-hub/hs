@@ -27,7 +27,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, currentView
       
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col w-full relative min-w-0">
-        <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} setCurrentView={setCurrentView} />
         <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8 scroll-smooth">
           <div className="max-w-7xl mx-auto w-full">
             {children}

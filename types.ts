@@ -430,3 +430,22 @@ export interface QuotationRequest {
   createdAt: string;
   updatedAt: string;
 }
+
+// Notification System
+export type NotificationType = 'quotation_request' | 'task_assigned' | 'lead_assigned' | 'info' | 'warning' | 'success';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  recipientId: string; // User ID who should receive this notification
+  recipientName: string;
+  senderId?: string; // User ID who triggered this notification
+  senderName?: string;
+  relatedId?: string; // Related entity ID (e.g., leadId, quotationRequestId, taskId)
+  relatedType?: string; // Type of related entity
+  actionUrl?: string; // View to navigate to when clicked
+  isRead: boolean;
+  createdAt: string;
+}

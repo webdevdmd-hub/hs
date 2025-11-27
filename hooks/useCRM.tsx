@@ -2,7 +2,8 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
 import {
   Lead, Customer, LeadStatus, TimelineEvent, Project, Task, CalendarEvent, Quotation, Invoice,
-  Calendar, CalendarShare, PublicBookingPage, Booking, UserSchedule, SharePermission, QuotationRequest
+  Calendar, CalendarShare, PublicBookingPage, Booking, UserSchedule, SharePermission, QuotationRequest,
+  Notification
 } from '../types';
 import { useAuth } from './useAuth';
 import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
@@ -92,6 +93,7 @@ interface CRMContextType {
   quotations: Quotation[];
   invoices: Invoice[];
   quotationRequests: QuotationRequest[];
+  notifications: Notification[];
   // New calendar feature states
   calendars: Calendar[];
   calendarShares: CalendarShare[];
@@ -155,6 +157,13 @@ interface CRMContextType {
   // User schedule operations
   saveUserSchedule: (schedule: Omit<UserSchedule, 'id' | 'updatedAt'>) => Promise<void>;
   getUserSchedule: (userId: string) => UserSchedule | undefined;
+
+  // Notification operations
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
+  getUnreadNotificationCount: () => number;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
@@ -169,6 +178,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [quotationRequests, setQuotationRequests] = useState<QuotationRequest[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // New calendar feature states
   const [calendars, setCalendars] = useState<Calendar[]>([]);
@@ -218,6 +228,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setQuotations([]);
       setInvoices([]);
       setQuotationRequests([]);
+      setNotifications([]);
       setCalendars([]);
       setCalendarShares([]);
       setPublicBookingPages([]);
@@ -269,6 +280,15 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setQuotationRequests(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as QuotationRequest) })));
     });
 
+    // Notifications - Only listen to notifications for current user
+    const unsubscribeNotifications = onSnapshot(collection(db, 'notifications'), (snapshot) => {
+      const userNotifications = snapshot.docs
+        .map(d => ({ id: d.id, ...(d.data() as Notification) }))
+        .filter(n => n.recipientId === currentUser.id)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setNotifications(userNotifications);
+    });
+
     // Calendar feature collections
     const unsubscribeCalendars = onSnapshot(collection(db, 'calendars'), (snapshot) => {
       setCalendars(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Calendar) })));
@@ -302,6 +322,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       unsubscribeQuotations();
       unsubscribeInvoices();
       unsubscribeQuotationRequests();
+      unsubscribeNotifications();
       unsubscribeCalendars();
       unsubscribeCalendarShares();
       unsubscribeBookingPages();
@@ -631,6 +652,44 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     await updateDoc(doc(crmSub('crm_quotation_requests'), requestId), updatedData);
   };
 
+  // --- NOTIFICATION OPERATIONS ---
+
+  const addNotification = async (notification: Omit<Notification, 'id' | 'createdAt'>) => {
+    const newNotification: Notification = {
+      id: `notif-${Date.now()}`,
+      ...notification,
+      createdAt: new Date().toISOString(),
+    };
+    setNotifications(prev => [newNotification, ...prev]);
+    await setDoc(doc(collection(db, 'notifications'), newNotification.id), newNotification);
+  };
+
+  const markNotificationAsRead = async (id: string) => {
+    setNotifications(prev => prev.map(notif =>
+      notif.id === id ? { ...notif, isRead: true } : notif
+    ));
+    await updateDoc(doc(collection(db, 'notifications'), id), { isRead: true });
+  };
+
+  const markAllNotificationsAsRead = async () => {
+    const unreadNotifications = notifications.filter(n => !n.isRead);
+    setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
+    await Promise.all(
+      unreadNotifications.map(notif =>
+        updateDoc(doc(collection(db, 'notifications'), notif.id), { isRead: true })
+      )
+    );
+  };
+
+  const deleteNotification = async (id: string) => {
+    setNotifications(prev => prev.filter(notif => notif.id !== id));
+    await deleteDoc(doc(collection(db, 'notifications'), id));
+  };
+
+  const getUnreadNotificationCount = () => {
+    return notifications.filter(n => !n.isRead).length;
+  };
+
   // --- CALENDAR OPERATIONS ---
 
   const addCalendar = async (calendar: Omit<Calendar, 'id' | 'createdAt'>) => {
@@ -781,6 +840,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       quotations,
       invoices,
       quotationRequests,
+      notifications,
       // New calendar feature states
       calendars,
       calendarShares,
@@ -819,6 +879,12 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       updateQuotationRequest,
       deleteQuotationRequest,
       assignQuotationRequestToCoordinator,
+      // Notification operations
+      addNotification,
+      markNotificationAsRead,
+      markAllNotificationsAsRead,
+      deleteNotification,
+      getUnreadNotificationCount,
       // Calendar operations
       addCalendar,
       updateCalendar,

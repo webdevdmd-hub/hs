@@ -125,11 +125,12 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
               </NavGroup>
           )}
 
-          {(hasPermission(Permission.VIEW_SALES_DASHBOARD) || hasPermission(Permission.VIEW_CUSTOMERS) || hasPermission(Permission.MANAGE_PROJECTS) || hasPermission(Permission.VIEW_QUOTATIONS) || hasPermission(Permission.VIEW_INVOICES)) && (
-            <NavGroup icon={<RocketIcon />} label="Sales" views={['sales_dashboard', 'customers', 'sales_projects', 'sales_quotations', 'sales_invoices']} currentView={currentView}>
+          {(hasPermission(Permission.VIEW_SALES_DASHBOARD) || hasPermission(Permission.VIEW_CUSTOMERS) || hasPermission(Permission.MANAGE_PROJECTS) || hasPermission(Permission.VIEW_QUOTATIONS) || hasPermission(Permission.VIEW_INVOICES) || hasPermission(Permission.VIEW_QUOTATION_REQUESTS)) && (
+            <NavGroup icon={<RocketIcon />} label="Sales" views={['sales_dashboard', 'customers', 'sales_projects', 'sales_quotations', 'sales_invoices', 'quotation_requests']} currentView={currentView}>
               {hasPermission(Permission.VIEW_SALES_DASHBOARD) && <NavLink icon={<DashboardIcon className="w-4 h-4" />} label="Dashboard" view="sales_dashboard" currentView={currentView} setCurrentView={setCurrentView} />}
               {hasPermission(Permission.VIEW_CUSTOMERS) && <NavLink icon={<ContactIcon className="w-4 h-4" />} label="Customers" view="customers" currentView={currentView} setCurrentView={setCurrentView} />}
               {hasPermission(Permission.MANAGE_PROJECTS) && <NavLink icon={<FolderIcon className="w-4 h-4" />} label="Projects" view="sales_projects" currentView={currentView} setCurrentView={setCurrentView} />}
+              {hasPermission(Permission.VIEW_QUOTATION_REQUESTS) && <NavLink icon={<DocumentIcon className="w-4 h-4" />} label="Quotation Requests" view="quotation_requests" currentView={currentView} setCurrentView={setCurrentView} />}
               {hasPermission(Permission.VIEW_QUOTATIONS) && <NavLink icon={<DocumentIcon className="w-4 h-4" />} label="Quotations" view="sales_quotations" currentView={currentView} setCurrentView={setCurrentView} />}
               {hasPermission(Permission.VIEW_INVOICES) && <NavLink icon={<CurrencyIcon className="w-4 h-4" />} label="Invoices" view="sales_invoices" currentView={currentView} setCurrentView={setCurrentView} />}
             </NavGroup>

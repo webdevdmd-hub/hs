@@ -10,7 +10,7 @@ import { useAuth } from '../../hooks/useAuth';
 
 const SalesLeads: React.FC = () => {
   const { currentUser, getRoleForUser, users, hasPermission, roles } = useAuth();
-  const { leads, updateLeadStatus, updateLead, deleteLead, addLead, addLeadTimelineEvent, addCustomer, addCalendarEntry, addTask, addQuotationRequest } = useCRM();
+  const { leads, updateLeadStatus, updateLead, deleteLead, addLead, addLeadTimelineEvent, addCustomer, addCalendarEntry, addTask, addQuotationRequest, addNotification } = useCRM();
   const [statusFilter, setStatusFilter] = useState<LeadStatus | 'All'>('All');
   const [dateFilter, setDateFilter] = useState('');
   const [userFilter, setUserFilter] = useState<string>('All'); // User filter for privileged roles
@@ -257,6 +257,21 @@ const SalesLeads: React.FC = () => {
         priority: quotationRequestFormData.priority,
         requirements: quotationRequestFormData.requirements,
         notes: quotationRequestFormData.notes,
+      });
+
+      // Create instant notification for Sales Coordination Head
+      await addNotification({
+        type: 'quotation_request',
+        title: 'New Quotation Request',
+        message: `${currentUser.name} submitted a quotation request for "${selectedLead.title}" (${selectedLead.customerName}) - ${quotationRequestFormData.priority} Priority`,
+        recipientId: coordinationHead.id,
+        recipientName: coordinationHead.name,
+        senderId: currentUser.id,
+        senderName: currentUser.name,
+        relatedId: selectedLead.id,
+        relatedType: 'quotation_request',
+        actionUrl: 'quotation_requests',
+        isRead: false,
       });
 
       // Add timeline event
@@ -1056,7 +1071,7 @@ const SalesLeads: React.FC = () => {
 
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-3">
-                      {hasPermission(Permission.CREATE_CUSTOMERS) &&
+                      {hasPermission(Permission.CONVERT_LEADS_TO_CUSTOMERS) &&
                        leadInView.status !== 'Won' &&
                        leadInView.status !== 'Lost' &&
                        !leadInView.convertedToCustomerId && (
@@ -1068,7 +1083,7 @@ const SalesLeads: React.FC = () => {
                           Convert to Customer
                         </Button>
                       )}
-                      {hasPermission(Permission.CREATE_QUOTATIONS) &&
+                      {hasPermission(Permission.CREATE_QUOTATION_REQUESTS) &&
                        leadInView.status !== 'Won' &&
                        leadInView.status !== 'Lost' &&
                        leadInView.convertedToCustomerId && (

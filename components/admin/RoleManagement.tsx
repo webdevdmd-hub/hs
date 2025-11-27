@@ -33,6 +33,7 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
             Permission.EDIT_LEADS,
             Permission.DELETE_LEADS,
             Permission.ASSIGN_LEADS,
+            Permission.CONVERT_LEADS_TO_CUSTOMERS,
             Permission.VIEW_ASSIGNED_TO,
             Permission.MANAGE_PROJECTS,
             Permission.VIEW_TASKS,
@@ -49,6 +50,15 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
             Permission.CREATE_CUSTOMERS,
             Permission.EDIT_CUSTOMERS,
             Permission.DELETE_CUSTOMERS,
+        ],
+    },
+    {
+        label: 'Quotation Requests',
+        permissions: [
+            Permission.VIEW_QUOTATION_REQUESTS,
+            Permission.CREATE_QUOTATION_REQUESTS,
+            Permission.ASSIGN_QUOTATION_REQUESTS,
+            Permission.PROCESS_QUOTATION_REQUESTS,
         ],
     },
     {
@@ -142,7 +152,7 @@ const RoleManagement: React.FC = () => {
     };
 
     const isSystemRole = (roleId: string) => {
-        return ['admin', 'sales_manager', 'sales_executive', 'accountant_head'].includes(roleId);
+        return ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(roleId);
     };
 
     return (
