@@ -16,7 +16,7 @@ service cloud.firestore {
     }
     function canWriteCRM() {
       let role = userRole();
-      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive']);
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator']);
     }
 
     function isManagerOrAdmin() {
@@ -110,6 +110,16 @@ service cloud.firestore {
       // Users can only write their own schedule
       allow create: if isAuthed() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAuthed() && resource.data.userId == request.auth.uid;
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthed() && resource.data.recipientId == request.auth.uid;
+      // Any authenticated user can create notifications (system-generated)
+      allow create: if isAuthed();
+      // Users can update/delete their own notifications (mark as read, delete)
+      allow update, delete: if isAuthed() && resource.data.recipientId == request.auth.uid;
     }
 
     // Fallback deny

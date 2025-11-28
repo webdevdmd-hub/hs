@@ -302,6 +302,8 @@ export interface Lead {
   id: string;
   title: string;
   customerName: string;
+  email?: string; // Customer email for communication
+  phone?: string; // Customer phone for communication
   value: number;
   status: LeadStatus;
   source: string;
@@ -351,10 +353,12 @@ export interface Task {
   dependencies?: string[]; // Task IDs this task depends on (for Gantt Chart)
   order?: number; // Display order within status column (for Kanban)
   // Origin and association tracking
-  createdFrom?: 'manual' | 'lead_calendar' | 'lead_schedule' | 'other'; // How the task was created
+  createdFrom?: 'manual' | 'lead_calendar' | 'lead_schedule' | 'quotation_request' | 'other'; // How the task was created
   leadId?: string; // Link to Lead if created from a lead
   leadTitle?: string; // Lead title for display
   leadCustomerName?: string; // Customer name from lead for context
+  quotationRequestId?: string; // Link to Quotation Request if created from quotation workflow
+  subtasks?: Task[]; // Child tasks for hierarchical structure (not stored in Firestore, computed from parentTaskId)
 }
 
 // Quotation Management

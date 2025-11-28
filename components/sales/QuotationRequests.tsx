@@ -5,7 +5,7 @@ import Modal from '../ui/Modal';
 import { useAuth } from '../../hooks/useAuth';
 import { useCRM } from '../../hooks/useCRM';
 import { QuotationRequest, QuotationRequestStatus, Permission, Task } from '../../types';
-import { FilterIcon, ChevronDownIcon, CheckCircleIcon, AlertCircleIcon, ClockIcon, UsersIcon } from '../icons/Icons';
+import { FilterIcon, ChevronDownIcon, CheckCircleIcon, AlertCircleIcon, ClockIcon, UsersIcon, PhoneIcon, MailIcon, MessageSquareIcon, PlusIcon } from '../icons/Icons';
 
 const QuotationRequests: React.FC = () => {
   const { currentUser, hasPermission, users = [] } = useAuth();
@@ -23,6 +23,10 @@ const QuotationRequests: React.FC = () => {
   const [selectedRequest, setSelectedRequest] = useState<QuotationRequest | null>(null);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedCoordinatorId, setSelectedCoordinatorId] = useState('');
+
+  // Custom tasks state
+  const [customTasks, setCustomTasks] = useState<Array<{title: string; description: string; priority: 'Low' | 'Medium' | 'High'; dueDate: string}>>([]);
+  const [taskFormData, setTaskFormData] = useState({ title: '', description: '', priority: 'Medium' as 'Low' | 'Medium' | 'High', dueDate: '' });
 
   // Filter quotation requests based on user role and permissions
   const filteredRequests = useMemo(() => {
@@ -46,47 +50,61 @@ const QuotationRequests: React.FC = () => {
     }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [quotationRequests, statusFilter, currentUser, hasPermission]);
 
-  // Get coordinators for assignment (users with PROCESS_QUOTATION_REQUESTS permission)
+  // Get coordinators for assignment
   const coordinators = useMemo(() => {
     return users.filter(u => u.isActive && u.roleId === 'sales_coordinator');
   }, [users]);
 
-  // Calculate progress for a quotation request
+  // Enhanced progress calculation across ALL modules
   const calculateProgress = (request: QuotationRequest) => {
     let progress = 0;
+    let steps = [];
 
     // Step 1: Request Created (20%)
     progress += 20;
+    steps.push({ name: 'Request Created', completed: true });
 
-    // Step 2: Assigned to Coordinator (40%)
+    // Step 2: Assigned to Coordinator (20%)
     if (request.assignedToCoordinatorId) {
       progress += 20;
+      steps.push({ name: 'Assigned', completed: true });
+    } else {
+      steps.push({ name: 'Assigned', completed: false });
     }
 
-    // Step 3: Task Created (60%)
+    // Step 3: Task Created (20%)
     const relatedTask = tasks?.find(t =>
-      t.leadId === request.leadId &&
+      t.quotationRequestId === request.id &&
       t.title?.includes('Quotation Request')
     );
     if (relatedTask) {
       progress += 20;
+      steps.push({ name: 'Task Created', completed: true });
+    } else {
+      steps.push({ name: 'Task Created', completed: false });
     }
 
-    // Step 4: Quotation Created (80%)
+    // Step 4: Quotation Created (20%)
     const relatedLead = leads?.find(l => l.id === request.leadId);
     const relatedQuotation = quotations?.find(q =>
       q.customerId === relatedLead?.convertedToCustomerId
     );
     if (relatedQuotation) {
       progress += 20;
+      steps.push({ name: 'Quotation Created', completed: true });
+    } else {
+      steps.push({ name: 'Quotation Created', completed: false });
     }
 
-    // Step 5: Completed (100%)
+    // Step 5: Completed (20%)
     if (request.status === 'Completed') {
       progress = 100;
+      steps.push({ name: 'Completed', completed: true });
+    } else {
+      steps.push({ name: 'Completed', completed: false });
     }
 
-    return Math.min(progress, 100);
+    return { progress: Math.min(progress, 100), steps };
   };
 
   // Get status color and icon
@@ -148,7 +166,20 @@ const QuotationRequests: React.FC = () => {
     }
   };
 
-  // Handle assignment to coordinator
+  // Add custom task to the list
+  const handleAddCustomTask = () => {
+    if (!taskFormData.title.trim()) return;
+
+    setCustomTasks([...customTasks, { ...taskFormData }]);
+    setTaskFormData({ title: '', description: '', priority: 'Medium', dueDate: '' });
+  };
+
+  // Remove custom task
+  const handleRemoveCustomTask = (index: number) => {
+    setCustomTasks(customTasks.filter((_, i) => i !== index));
+  };
+
+  // Handle assignment to coordinator with custom tasks
   const handleAssignToCoordinator = async () => {
     if (!selectedRequest || !selectedCoordinatorId) return;
 
@@ -164,29 +195,51 @@ const QuotationRequests: React.FC = () => {
         updatedAt: new Date().toISOString()
       });
 
-      // Create task for the coordinator
+      // Create main quotation request task
       const lead = leads.find(l => l.id === selectedRequest.leadId);
-      const newTask: Task = {
-        id: `quotation-task-${Date.now()}`,
+      const mainTaskId = `quotation-task-${Date.now()}`;
+      const mainTask: Task = {
+        id: mainTaskId,
         title: `Quotation Request: ${selectedRequest.leadTitle}`,
         description: `Process quotation request for ${selectedRequest.customerName}.\n\nEstimated Value: $${selectedRequest.estimatedValue.toLocaleString()}\n\nRequirements: ${selectedRequest.requirements || 'N/A'}\n\nNotes: ${selectedRequest.notes || 'N/A'}`,
         assignedTo: coordinator.id,
         status: 'To Do',
         priority: selectedRequest.priority === 'Urgent' ? 'High' : selectedRequest.priority === 'High' ? 'High' : 'Medium',
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
-        createdFrom: 'other',
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        createdFrom: 'quotation_request',
         leadId: selectedRequest.leadId,
         leadTitle: selectedRequest.leadTitle,
-        leadCustomerName: selectedRequest.customerName
+        leadCustomerName: selectedRequest.customerName,
+        quotationRequestId: selectedRequest.id
       };
 
-      await addTask(newTask);
+      await addTask(mainTask);
+
+      // Create custom subtasks
+      for (const customTask of customTasks) {
+        const subtask: Task = {
+          id: `subtask-${Date.now()}-${Math.random()}`,
+          title: customTask.title,
+          description: customTask.description,
+          assignedTo: coordinator.id,
+          status: 'To Do',
+          priority: customTask.priority,
+          dueDate: customTask.dueDate,
+          createdFrom: 'quotation_request',
+          parentTaskId: mainTaskId, // Link to main task
+          leadId: selectedRequest.leadId,
+          leadTitle: selectedRequest.leadTitle,
+          leadCustomerName: selectedRequest.customerName,
+          quotationRequestId: selectedRequest.id
+        };
+        await addTask(subtask);
+      }
 
       // Create notification for the coordinator
       await addNotification({
         type: 'task_assigned',
         title: 'New Quotation Task Assigned',
-        message: `You have been assigned to process a quotation request for "${selectedRequest.leadTitle}" (${selectedRequest.customerName}) - ${selectedRequest.priority} Priority`,
+        message: `You have been assigned to process a quotation request for "${selectedRequest.leadTitle}" (${selectedRequest.customerName}) - ${selectedRequest.priority} Priority${customTasks.length > 0 ? ` with ${customTasks.length} subtask(s)` : ''}`,
         recipientId: coordinator.id,
         recipientName: coordinator.name,
         senderId: currentUser?.id,
@@ -202,9 +255,11 @@ const QuotationRequests: React.FC = () => {
         status: 'In Progress' as QuotationRequestStatus
       });
 
+      // Reset form
       setIsAssignModalOpen(false);
       setSelectedRequest(null);
       setSelectedCoordinatorId('');
+      setCustomTasks([]);
     } catch (error) {
       console.error('Error assigning quotation request:', error);
       alert('Failed to assign quotation request. Please try again.');
@@ -221,6 +276,20 @@ const QuotationRequests: React.FC = () => {
     } catch (error) {
       console.error('Error updating status:', error);
     }
+  };
+
+  // Communication helpers
+  const handleWhatsApp = (phone: string) => {
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    window.open(`https://wa.me/${cleanPhone}`, '_blank');
+  };
+
+  const handleEmail = (email: string) => {
+    window.location.href = `mailto:${email}`;
+  };
+
+  const handleCall = (phone: string) => {
+    window.location.href = `tel:${phone}`;
   };
 
   return (
@@ -279,158 +348,211 @@ const QuotationRequests: React.FC = () => {
         })}
       </div>
 
-      {/* Quotation Request Cards */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* Quotation Request Cards - Grid Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredRequests.length === 0 ? (
-          <Card className="!p-12 text-center">
-            <div className="text-slate-400 text-sm">
-              <AlertCircleIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No quotation requests found</p>
-              <p className="text-xs mt-1">Quotation requests will appear here when created</p>
-            </div>
-          </Card>
+          <div className="col-span-full">
+            <Card className="!p-12 text-center">
+              <div className="text-slate-400 text-sm">
+                <AlertCircleIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No quotation requests found</p>
+                <p className="text-xs mt-1">Quotation requests will appear here when created</p>
+              </div>
+            </Card>
+          </div>
         ) : (
           filteredRequests.map(request => {
-            const progress = calculateProgress(request);
+            const { progress, steps } = calculateProgress(request);
             const statusStyle = getStatusStyle(request.status);
             const lead = leads.find(l => l.id === request.leadId);
 
             return (
-              <Card key={request.id} className="!p-6 hover:shadow-lg transition-shadow">
-                <div className="space-y-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-lg font-semibold text-slate-900">
-                          {request.leadTitle}
-                        </h3>
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}>
-                          {statusStyle.icon}
-                          {request.status}
-                        </span>
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${getPriorityColor(request.priority)}`}>
-                          {request.priority}
-                        </span>
-                      </div>
-                      <p className="text-slate-600 mt-1 text-sm">
-                        <span className="font-medium">Customer:</span> {request.customerName}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-emerald-600">
-                        ${request.estimatedValue.toLocaleString()}
-                      </p>
-                      <p className="text-xs text-slate-500">Estimated Value</p>
-                    </div>
+              <Card key={request.id} className="!p-5 hover:shadow-lg transition-shadow flex flex-col">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2 mb-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-slate-900 truncate">
+                      {request.leadTitle}
+                    </h3>
+                    <p className="text-sm text-slate-600 truncate mt-0.5">
+                      {request.customerName}
+                    </p>
                   </div>
-
-                  {/* Progress Bar */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-slate-700">Progress</span>
-                      <span className="text-xs font-bold text-emerald-600">{progress}%</span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                      <div
-                        className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-full rounded-full transition-all duration-500"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                      <span>Created • {new Date(request.createdAt).toLocaleDateString()}</span>
-                      <span>Updated • {new Date(request.updatedAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  {/* Details Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Requested By</p>
-                      <p className="text-sm text-slate-900">{request.requestedByName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Assigned To</p>
-                      <p className="text-sm text-slate-900">
-                        {request.assignedToCoordinatorName || 'Not assigned yet'}
-                      </p>
-                    </div>
-                    {request.requirements && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Requirements</p>
-                        <p className="text-sm text-slate-700">{request.requirements}</p>
-                      </div>
-                    )}
-                    {request.notes && (
-                      <div className="md:col-span-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase mb-1">Notes</p>
-                        <p className="text-sm text-slate-700">{request.notes}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  {hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS) &&
-                   request.status === 'Pending' && (
-                    <div className="flex gap-3 pt-4 border-t border-slate-100">
-                      <Button
-                        onClick={() => {
-                          setSelectedRequest(request);
-                          setIsAssignModalOpen(true);
-                        }}
-                        className="flex-1"
-                      >
-                        <UsersIcon className="w-4 h-4 mr-2" />
-                        Assign to Coordinator
-                      </Button>
-                    </div>
-                  )}
-
-                  {hasPermission(Permission.PROCESS_QUOTATION_REQUESTS) &&
-                   request.assignedToCoordinatorId === currentUser?.id &&
-                   request.status === 'In Progress' && (
-                    <div className="flex gap-3 pt-4 border-t border-slate-100">
-                      <Button
-                        onClick={() => handleStatusUpdate(request.id, 'Completed')}
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                      >
-                        <CheckCircleIcon className="w-4 h-4 mr-2" />
-                        Mark as Completed
-                      </Button>
-                    </div>
-                  )}
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border shrink-0 ${getPriorityColor(request.priority)}`}>
+                    {request.priority}
+                  </span>
                 </div>
+
+                {/* Status Badge */}
+                <div className="mb-4">
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}>
+                    {statusStyle.icon}
+                    {request.status}
+                  </span>
+                </div>
+
+                {/* Estimated Value */}
+                <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                  <p className="text-xs text-emerald-600 font-semibold uppercase">Estimated Value</p>
+                  <p className="text-2xl font-bold text-emerald-700 mt-1">
+                    ${request.estimatedValue.toLocaleString()}
+                  </p>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-slate-700">Progress</span>
+                    <span className="text-xs font-bold text-emerald-600">{progress}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-gradient-to-r from-emerald-500 to-emerald-600 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 mt-2 flex-wrap">
+                    {steps.map((step, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-xs px-2 py-0.5 rounded ${
+                          step.completed
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {step.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Details Grid */}
+                <div className="space-y-2 mb-4 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Requested By:</span>
+                    <span className="text-slate-900 font-medium">{request.requestedByName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Assigned To:</span>
+                    <span className="text-slate-900 font-medium">
+                      {request.assignedToCoordinatorName || 'Not assigned'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Created:</span>
+                    <span className="text-slate-900">{new Date(request.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+
+                {/* Communication Links */}
+                {lead && (
+                  <div className="pt-4 border-t border-slate-100">
+                    <p className="text-xs font-semibold text-slate-600 uppercase mb-2">Quick Actions</p>
+                    <div className="flex gap-2">
+                      {lead.phone && (
+                        <>
+                          <button
+                            onClick={() => handleWhatsApp(lead.phone!)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 rounded-lg transition-colors text-xs font-medium"
+                            title="WhatsApp"
+                          >
+                            <MessageSquareIcon className="w-4 h-4" />
+                            WhatsApp
+                          </button>
+                          <button
+                            onClick={() => handleCall(lead.phone!)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors text-xs font-medium"
+                            title="Call"
+                          >
+                            <PhoneIcon className="w-4 h-4" />
+                            Call
+                          </button>
+                        </>
+                      )}
+                      {lead.email && (
+                        <button
+                          onClick={() => handleEmail(lead.email!)}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors text-xs font-medium"
+                          title="Email"
+                        >
+                          <MailIcon className="w-4 h-4" />
+                          Email
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                {hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS) &&
+                 request.status === 'Pending' && (
+                  <div className="mt-auto pt-4 border-t border-slate-100">
+                    <Button
+                      onClick={() => {
+                        setSelectedRequest(request);
+                        setIsAssignModalOpen(true);
+                      }}
+                      className="w-full !py-2 !text-sm"
+                    >
+                      <UsersIcon className="w-4 h-4 mr-2" />
+                      Assign to Coordinator
+                    </Button>
+                  </div>
+                )}
+
+                {hasPermission(Permission.PROCESS_QUOTATION_REQUESTS) &&
+                 request.assignedToCoordinatorId === currentUser?.id &&
+                 request.status === 'In Progress' && (
+                  <div className="mt-auto pt-4 border-t border-slate-100">
+                    <Button
+                      onClick={() => handleStatusUpdate(request.id, 'Completed')}
+                      className="w-full !py-2 !text-sm bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      <CheckCircleIcon className="w-4 h-4 mr-2" />
+                      Mark as Completed
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })
         )}
       </div>
 
-      {/* Assignment Modal */}
+      {/* Assignment Modal with Custom Tasks */}
       <Modal
         isOpen={isAssignModalOpen}
         onClose={() => {
           setIsAssignModalOpen(false);
           setSelectedRequest(null);
           setSelectedCoordinatorId('');
+          setCustomTasks([]);
         }}
-        title="Assign to Coordinator"
+        title="Assign Quotation Request"
       >
         {selectedRequest && (
           <div className="space-y-4">
+            {/* Request Details */}
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
               <p className="text-sm font-semibold text-slate-700 mb-2">Request Details</p>
-              <p className="text-sm text-slate-600">
-                <span className="font-medium">Lead:</span> {selectedRequest.leadTitle}
-              </p>
-              <p className="text-sm text-slate-600">
-                <span className="font-medium">Customer:</span> {selectedRequest.customerName}
-              </p>
-              <p className="text-sm text-slate-600">
-                <span className="font-medium">Value:</span> ${selectedRequest.estimatedValue.toLocaleString()}
-              </p>
+              <div className="space-y-1 text-sm">
+                <p className="text-slate-600">
+                  <span className="font-medium">Lead:</span> {selectedRequest.leadTitle}
+                </p>
+                <p className="text-slate-600">
+                  <span className="font-medium">Customer:</span> {selectedRequest.customerName}
+                </p>
+                <p className="text-slate-600">
+                  <span className="font-medium">Value:</span> ${selectedRequest.estimatedValue.toLocaleString()}
+                </p>
+                <p className="text-slate-600">
+                  <span className="font-medium">Priority:</span> {selectedRequest.priority}
+                </p>
+              </div>
             </div>
 
+            {/* Select Coordinator */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-2 uppercase">
                 Select Coordinator
@@ -454,6 +576,94 @@ const QuotationRequests: React.FC = () => {
               )}
             </div>
 
+            {/* Custom Tasks Section */}
+            <div className="border-t border-slate-200 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-xs font-semibold text-slate-700 uppercase">
+                  Additional Tasks (Optional)
+                </label>
+                <span className="text-xs text-slate-500">{customTasks.length} task(s) added</span>
+              </div>
+
+              {/* Custom Task Form */}
+              <div className="bg-slate-50 rounded-lg p-3 space-y-2 mb-3">
+                <input
+                  type="text"
+                  placeholder="Task title"
+                  value={taskFormData.title}
+                  onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <textarea
+                  placeholder="Task description (optional)"
+                  value={taskFormData.description}
+                  onChange={(e) => setTaskFormData({ ...taskFormData, description: e.target.value })}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none"
+                  rows={2}
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={taskFormData.priority}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value as 'Low' | 'Medium' | 'High' })}
+                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option value="Low">Low Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="High">High Priority</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={taskFormData.dueDate}
+                    onChange={(e) => setTaskFormData({ ...taskFormData, dueDate: e.target.value })}
+                    className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleAddCustomTask}
+                  variant="ghost"
+                  className="w-full !py-2 !text-xs"
+                  disabled={!taskFormData.title.trim()}
+                >
+                  <PlusIcon className="w-4 h-4 mr-1" />
+                  Add Task
+                </Button>
+              </div>
+
+              {/* Custom Tasks List */}
+              {customTasks.length > 0 && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {customTasks.map((task, index) => (
+                    <div key={index} className="bg-white border border-slate-200 rounded-lg p-3 flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{task.title}</p>
+                        {task.description && (
+                          <p className="text-xs text-slate-600 truncate">{task.description}</p>
+                        )}
+                        <div className="flex gap-2 mt-1">
+                          <span className={`text-xs px-2 py-0.5 rounded ${getPriorityColor(task.priority)}`}>
+                            {task.priority}
+                          </span>
+                          {task.dueDate && (
+                            <span className="text-xs text-slate-500">
+                              Due: {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveCustomTask(index)}
+                        className="text-slate-400 hover:text-red-600 transition-colors shrink-0"
+                      >
+                        <XIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-4">
               <Button
                 variant="ghost"
@@ -461,6 +671,7 @@ const QuotationRequests: React.FC = () => {
                   setIsAssignModalOpen(false);
                   setSelectedRequest(null);
                   setSelectedCoordinatorId('');
+                  setCustomTasks([]);
                 }}
               >
                 Cancel
@@ -469,7 +680,7 @@ const QuotationRequests: React.FC = () => {
                 onClick={handleAssignToCoordinator}
                 disabled={!selectedCoordinatorId}
               >
-                Assign & Create Task
+                Assign & Create Task{customTasks.length > 0 ? 's' : ''}
               </Button>
             </div>
           </div>
