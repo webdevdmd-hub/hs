@@ -1047,33 +1047,92 @@ const SalesLeads: React.FC = () => {
                  </div>
 
                 <div className="p-6 space-y-8">
-                    {/* Timeline (Moved to Top) */}
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
-                        <div className="space-y-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                            {leadInView.timeline && leadInView.timeline.map((event) => (
-                                <div key={event.id} className="relative pl-6">
-                                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
-                                            event.type === 'created' ? 'bg-blue-400' :
-                                            event.type === 'status_change' ? 'bg-emerald-400' :
-                                            event.type === 'estimation' ? 'bg-indigo-400' :
-                                            event.type === 'conversion' ? 'bg-purple-400' :
-                                            event.type === 'task' ? 'bg-amber-400' :
-                                            event.type === 'meeting' ? 'bg-orange-400' :
-                                            event.type === 'email' ? 'bg-cyan-400' :
-                                            event.type === 'call' ? 'bg-amber-400' :
-                                            event.type === 'activity' ? 'bg-slate-400' :
-                                            'bg-slate-300'
-                                        }`}></div>
-                                    <p className="text-sm text-slate-800 font-medium">{event.text}</p>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                        {new Date(event.date).toLocaleString()} • <span className="text-slate-500">{event.user || 'System'}</span>
-                                    </p>
-                                </div>
-                            ))}
-                            {(!leadInView.timeline || leadInView.timeline.length === 0) && (
-                                <p className="text-xs text-slate-400 italic pl-6">No history recorded.</p>
-                            )}
+                    {/* Timeline with Action Buttons on Right */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Timeline (Left Side - 2/3 width) */}
+                        <div className="lg:col-span-2">
+                            <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
+                            <div className="space-y-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
+                                {leadInView.timeline && leadInView.timeline.map((event) => (
+                                    <div key={event.id} className="relative pl-6">
+                                            <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
+                                                event.type === 'created' ? 'bg-blue-400' :
+                                                event.type === 'status_change' ? 'bg-emerald-400' :
+                                                event.type === 'estimation' ? 'bg-indigo-400' :
+                                                event.type === 'conversion' ? 'bg-purple-400' :
+                                                event.type === 'task' ? 'bg-amber-400' :
+                                                event.type === 'meeting' ? 'bg-orange-400' :
+                                                event.type === 'email' ? 'bg-cyan-400' :
+                                                event.type === 'call' ? 'bg-amber-400' :
+                                                event.type === 'activity' ? 'bg-slate-400' :
+                                                'bg-slate-300'
+                                            }`}></div>
+                                        <p className="text-sm text-slate-800 font-medium">{event.text}</p>
+                                        <p className="text-xs text-slate-400 mt-1">
+                                            {new Date(event.date).toLocaleString()} • <span className="text-slate-500">{event.user || 'System'}</span>
+                                        </p>
+                                    </div>
+                                ))}
+                                {(!leadInView.timeline || leadInView.timeline.length === 0) && (
+                                    <p className="text-xs text-slate-400 italic pl-6">No history recorded.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Action Buttons (Right Side - 1/3 width) */}
+                        <div className="lg:col-span-1">
+                            <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
+                            <div className="space-y-3">
+                              {/* Convert to Customer */}
+                              {hasPermission(Permission.CONVERT_LEADS_TO_CUSTOMERS) &&
+                               leadInView.status !== 'Won' &&
+                               leadInView.status !== 'Lost' &&
+                               !leadInView.convertedToCustomerId && (
+                                <Button
+                                  onClick={handleOpenConvertModal}
+                                  className="w-full shadow-lg shadow-emerald-200"
+                                >
+                                  <CheckCircleIcon className="w-4 h-4 mr-2" />
+                                  Convert to Customer
+                                </Button>
+                              )}
+
+                              {/* Request for Quotation */}
+                              {hasPermission(Permission.CREATE_QUOTATION_REQUESTS) &&
+                               leadInView.status !== 'Won' &&
+                               leadInView.status !== 'Lost' &&
+                               leadInView.convertedToCustomerId && (
+                                <Button
+                                  onClick={handleOpenQuotationRequestModal}
+                                  className="w-full shadow-lg shadow-emerald-200"
+                                >
+                                  <PlusIcon className="w-4 h-4 mr-2" />
+                                  Request for Quotation
+                                </Button>
+                              )}
+
+                              {/* Log Follow-up */}
+                              {hasPermission(Permission.EDIT_LEADS) && (
+                                <Button
+                                  onClick={() => setIsLogFollowupModalOpen(true)}
+                                  className="w-full shadow-lg shadow-emerald-200"
+                                >
+                                  <CalendarIcon className="w-4 h-4 mr-2" />
+                                  Log Follow-up
+                                </Button>
+                              )}
+
+                              {/* Add Task to Calendar */}
+                              {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
+                                <Button
+                                  onClick={() => setIsAddTaskModalOpen(true)}
+                                  className="w-full shadow-lg shadow-emerald-200"
+                                >
+                                  <PlusIcon className="w-4 h-4 mr-2" />
+                                  Add Task to Calendar
+                                </Button>
+                              )}
+                            </div>
                         </div>
                     </div>
 
@@ -1135,58 +1194,6 @@ const SalesLeads: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-3">
-                      {hasPermission(Permission.CONVERT_LEADS_TO_CUSTOMERS) &&
-                       leadInView.status !== 'Won' &&
-                       leadInView.status !== 'Lost' &&
-                       !leadInView.convertedToCustomerId && (
-                        <Button
-                          onClick={handleOpenConvertModal}
-                          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-300/50 hover:-translate-y-0.5"
-                        >
-                          <CheckCircleIcon className="w-4 h-4 mr-2" />
-                          Convert to Customer
-                        </Button>
-                      )}
-                      {hasPermission(Permission.CREATE_QUOTATION_REQUESTS) &&
-                       leadInView.status !== 'Won' &&
-                       leadInView.status !== 'Lost' &&
-                       leadInView.convertedToCustomerId && (
-                        <Button
-                          onClick={handleOpenQuotationRequestModal}
-                          className="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white shadow-lg shadow-teal-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-teal-300/50 hover:-translate-y-0.5"
-                        >
-                          <PlusIcon className="w-4 h-4 mr-2" />
-                          Request for Quotation
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Action Buttons for Log Follow-up and Add Task */}
-                    {(hasPermission(Permission.EDIT_LEADS) || hasPermission(Permission.MANAGE_CRM_CALENDAR)) && (
-                      <div className="flex flex-wrap gap-3">
-                        {hasPermission(Permission.EDIT_LEADS) && (
-                          <Button
-                            onClick={() => setIsLogFollowupModalOpen(true)}
-                            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-green-300/50 hover:-translate-y-0.5"
-                          >
-                            <CalendarIcon className="w-4 h-4 mr-2" />
-                            Log Follow-up
-                          </Button>
-                        )}
-
-                        {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
-                          <Button
-                            onClick={() => setIsAddTaskModalOpen(true)}
-                            className="bg-gradient-to-r from-lime-500 to-green-600 hover:from-lime-600 hover:to-green-700 text-white shadow-lg shadow-lime-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-lime-300/50 hover:-translate-y-0.5"
-                          >
-                            <PlusIcon className="w-4 h-4 mr-2" />
-                            Add Task to Calendar
-                          </Button>
-                        )}
-                      </div>
-                    )}
                 </div>
             </div>
         </div>
