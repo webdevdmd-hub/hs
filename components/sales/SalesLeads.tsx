@@ -52,6 +52,12 @@ const SalesLeads: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [leadToDeleteId, setLeadToDeleteId] = useState<string | null>(null);
 
+  // Log Follow-up Modal State
+  const [isLogFollowupModalOpen, setIsLogFollowupModalOpen] = useState(false);
+
+  // Add Task to Calendar Modal State
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+
   // Convert to Customer Modal State
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [convertFormData, setConvertFormData] = useState({
@@ -272,10 +278,20 @@ const SalesLeads: React.FC = () => {
         notes: quotationRequestFormData.notes,
       });
 
+      // Automatically update lead status to 'Proposal' when RFQ is submitted
+      await updateLeadStatus(selectedLead.id, 'Proposal');
+
       // Add timeline event
       await addLeadTimelineEvent(selectedLead.id, {
         text: `Quotation request submitted - Priority: ${quotationRequestFormData.priority}`,
         type: 'activity',
+        user: currentUser.name
+      });
+
+      // Add timeline event for status change
+      await addLeadTimelineEvent(selectedLead.id, {
+        text: `Status changed to Proposal (Quotation request submitted)`,
+        type: 'status_change',
         user: currentUser.name
       });
 
@@ -285,7 +301,7 @@ const SalesLeads: React.FC = () => {
         requirements: '',
         notes: ''
       });
-      alert(`Quotation request submitted successfully! All Sales Coordination Heads have been notified.`);
+      alert(`Quotation request submitted successfully! Lead status updated to Proposal. All Sales Coordination Heads have been notified.`);
     } catch (error) {
       console.error('Error submitting quotation request:', error);
       alert('Failed to submit quotation request. Please try again.');
@@ -1031,6 +1047,36 @@ const SalesLeads: React.FC = () => {
                  </div>
 
                 <div className="p-6 space-y-8">
+                    {/* Timeline (Moved to Top) */}
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
+                        <div className="space-y-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
+                            {leadInView.timeline && leadInView.timeline.map((event) => (
+                                <div key={event.id} className="relative pl-6">
+                                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
+                                            event.type === 'created' ? 'bg-blue-400' :
+                                            event.type === 'status_change' ? 'bg-emerald-400' :
+                                            event.type === 'estimation' ? 'bg-indigo-400' :
+                                            event.type === 'conversion' ? 'bg-purple-400' :
+                                            event.type === 'task' ? 'bg-amber-400' :
+                                            event.type === 'meeting' ? 'bg-orange-400' :
+                                            event.type === 'email' ? 'bg-cyan-400' :
+                                            event.type === 'call' ? 'bg-amber-400' :
+                                            event.type === 'activity' ? 'bg-slate-400' :
+                                            'bg-slate-300'
+                                        }`}></div>
+                                    <p className="text-sm text-slate-800 font-medium">{event.text}</p>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        {new Date(event.date).toLocaleString()} • <span className="text-slate-500">{event.user || 'System'}</span>
+                                    </p>
+                                </div>
+                            ))}
+                            {(!leadInView.timeline || leadInView.timeline.length === 0) && (
+                                <p className="text-xs text-slate-400 italic pl-6">No history recorded.</p>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
                             <h3 className="text-sm font-semibold text-slate-700 mb-3">Lead Details</h3>
@@ -1097,7 +1143,7 @@ const SalesLeads: React.FC = () => {
                        !leadInView.convertedToCustomerId && (
                         <Button
                           onClick={handleOpenConvertModal}
-                          className="bg-purple-600 hover:bg-purple-700 text-white shadow-purple-200"
+                          className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-300/50 hover:-translate-y-0.5"
                         >
                           <CheckCircleIcon className="w-4 h-4 mr-2" />
                           Convert to Customer
@@ -1109,7 +1155,7 @@ const SalesLeads: React.FC = () => {
                        leadInView.convertedToCustomerId && (
                         <Button
                           onClick={handleOpenQuotationRequestModal}
-                          className="bg-blue-600 hover:bg-blue-700 text-white shadow-blue-200"
+                          className="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700 text-white shadow-lg shadow-teal-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-teal-300/50 hover:-translate-y-0.5"
                         >
                           <PlusIcon className="w-4 h-4 mr-2" />
                           Request for Quotation
@@ -1117,149 +1163,237 @@ const SalesLeads: React.FC = () => {
                       )}
                     </div>
 
+                    {/* Action Buttons for Log Follow-up and Add Task */}
                     {(hasPermission(Permission.EDIT_LEADS) || hasPermission(Permission.MANAGE_CRM_CALENDAR)) && (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="flex flex-wrap gap-3">
                         {hasPermission(Permission.EDIT_LEADS) && (
-                        <div className="rounded-xl border border-slate-100 bg-white p-4">
-                          <h3 className="text-sm font-semibold text-slate-700 mb-3">Log Follow-up</h3>
-                          <form onSubmit={handleLogActivity} className="space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Type</label>
-                                <select
-                                  value={activityForm.type}
-                                  onChange={(e) =>
-                                    setActivityForm((prev) => ({ ...prev, type: e.target.value as any }))
-                                  }
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                                >
-                                  <option value="call">Call</option>
-                                  <option value="email">Email</option>
-                                  <option value="meeting">Meeting</option>
-                                  <option value="activity">Other</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">When</label>
-                                <input
-                                  type="datetime-local"
-                                  value={activityForm.dateTime}
-                                  onChange={(e) =>
-                                    setActivityForm((prev) => ({ ...prev, dateTime: e.target.value }))
-                                  }
-                                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                                />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Notes</label>
-                              <textarea
-                                required
-                                value={activityForm.note}
-                                onChange={(e) =>
-                                  setActivityForm((prev) => ({ ...prev, note: e.target.value }))
-                                }
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                                placeholder="What happened? e.g. Email sent with proposal"
-                                rows={3}
-                              />
-                            </div>
-                            <div className="flex justify-end">
-                              <Button type="submit" disabled={!activityForm.note.trim()}>
-                                Log Activity
-                              </Button>
-                            </div>
-                          </form>
-                        </div>
+                          <Button
+                            onClick={() => setIsLogFollowupModalOpen(true)}
+                            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-green-300/50 hover:-translate-y-0.5"
+                          >
+                            <CalendarIcon className="w-4 h-4 mr-2" />
+                            Log Follow-up
+                          </Button>
                         )}
 
                         {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
-                        <div className="rounded-xl border border-slate-100 bg-white p-4">
-                          <h3 className="text-sm font-semibold text-slate-700 mb-3">Add Task to Calendar</h3>
-                          <form onSubmit={handleSchedule} className="space-y-3">
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Task Title</label>
-                              <input
-                                required
-                                type="text"
-                                value={scheduleForm.title}
-                                onChange={(e) =>
-                                  setScheduleForm((prev) => ({ ...prev, title: e.target.value }))
-                                }
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                                placeholder="e.g. Follow up with client"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Due Date & Time</label>
-                              <input
-                                required
-                                type="datetime-local"
-                                value={scheduleForm.dateTime}
-                                onChange={(e) =>
-                                  setScheduleForm((prev) => ({ ...prev, dateTime: e.target.value }))
-                                }
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-semibold text-slate-500 mb-1 uppercase tracking-wide">Description (Optional)</label>
-                              <textarea
-                                value={scheduleForm.description}
-                                onChange={(e) =>
-                                  setScheduleForm((prev) => ({ ...prev, description: e.target.value }))
-                                }
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500"
-                                placeholder="Add task details..."
-                                rows={2}
-                              />
-                            </div>
-                            <div className="flex justify-end">
-                              <Button
-                                type="submit"
-                                disabled={!scheduleForm.title.trim() || isSavingTask}
-                              >
-                                {isSavingTask ? 'Saving...' : 'Save Task'}
-                              </Button>
-                            </div>
-                          </form>
-                        </div>
+                          <Button
+                            onClick={() => setIsAddTaskModalOpen(true)}
+                            className="bg-gradient-to-r from-lime-500 to-green-600 hover:from-lime-600 hover:to-green-700 text-white shadow-lg shadow-lime-200/50 transition-all duration-300 hover:shadow-xl hover:shadow-lime-300/50 hover:-translate-y-0.5"
+                          >
+                            <PlusIcon className="w-4 h-4 mr-2" />
+                            Add Task to Calendar
+                          </Button>
                         )}
                       </div>
                     )}
-
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
-                        <div className="space-y-6 relative before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-100">
-                            {leadInView.timeline && leadInView.timeline.map((event) => (
-                                <div key={event.id} className="relative pl-6">
-                                        <div className={`absolute left-0 top-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${
-                                            event.type === 'created' ? 'bg-blue-400' :
-                                            event.type === 'status_change' ? 'bg-emerald-400' :
-                                            event.type === 'estimation' ? 'bg-indigo-400' :
-                                            event.type === 'conversion' ? 'bg-purple-400' :
-                                            event.type === 'task' ? 'bg-amber-400' :
-                                            event.type === 'meeting' ? 'bg-orange-400' :
-                                            event.type === 'email' ? 'bg-cyan-400' :
-                                            event.type === 'call' ? 'bg-amber-400' :
-                                            event.type === 'activity' ? 'bg-slate-400' :
-                                            'bg-slate-300'
-                                        }`}></div>
-                                    <p className="text-sm text-slate-800 font-medium">{event.text}</p>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                        {new Date(event.date).toLocaleString()} • <span className="text-slate-500">{event.user || 'System'}</span>
-                                    </p>
-                                </div>
-                            ))}
-                            {(!leadInView.timeline || leadInView.timeline.length === 0) && (
-                                <p className="text-xs text-slate-400 italic pl-6">No history recorded.</p>
-                            )}
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
       )}
+
+      {/* Log Follow-up Modal */}
+      <Modal
+        isOpen={isLogFollowupModalOpen}
+        onClose={() => setIsLogFollowupModalOpen(false)}
+        title="Log Follow-up"
+        maxWidth="md"
+      >
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          if (selectedLead && activityForm.note.trim() && hasPermission(Permission.EDIT_LEADS)) {
+            const typeLabel =
+              activityForm.type === 'call'
+                ? 'Call'
+                : activityForm.type === 'email'
+                ? 'Email'
+                : activityForm.type === 'meeting'
+                ? 'Meeting'
+                : 'Activity';
+            addLeadTimelineEvent(selectedLead.id, {
+              text: `${typeLabel}: ${activityForm.note.trim()}`,
+              type: activityForm.type,
+              user: currentUser?.name || 'System',
+              date: activityForm.dateTime ? new Date(activityForm.dateTime).toISOString() : undefined,
+            });
+            setActivityForm((prev) => ({
+              ...prev,
+              note: '',
+            }));
+            setIsLogFollowupModalOpen(false);
+          }
+        }} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Type</label>
+              <select
+                value={activityForm.type}
+                onChange={(e) =>
+                  setActivityForm((prev) => ({ ...prev, type: e.target.value as any }))
+                }
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              >
+                <option value="call">Call</option>
+                <option value="email">Email</option>
+                <option value="meeting">Meeting</option>
+                <option value="activity">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">When</label>
+              <input
+                type="datetime-local"
+                value={activityForm.dateTime}
+                onChange={(e) =>
+                  setActivityForm((prev) => ({ ...prev, dateTime: e.target.value }))
+                }
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Notes</label>
+            <textarea
+              required
+              value={activityForm.note}
+              onChange={(e) =>
+                setActivityForm((prev) => ({ ...prev, note: e.target.value }))
+              }
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
+              placeholder="What happened? e.g. Email sent with proposal"
+              rows={4}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-3">
+            <Button type="button" variant="ghost" onClick={() => setIsLogFollowupModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!activityForm.note.trim()}>
+              Log Activity
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Task to Calendar Modal */}
+      <Modal
+        isOpen={isAddTaskModalOpen}
+        onClose={() => setIsAddTaskModalOpen(false)}
+        title="Add Task to Calendar"
+        maxWidth="md"
+      >
+        <form onSubmit={async (e) => {
+          e.preventDefault();
+          if (!selectedLead || !scheduleForm.title.trim() || !hasPermission(Permission.MANAGE_CRM_CALENDAR) || isSavingTask) {
+            return;
+          }
+
+          setIsSavingTask(true);
+          try {
+            const isoDate = new Date(scheduleForm.dateTime).toISOString();
+            const taskDescription = scheduleForm.description.trim()
+              ? `${scheduleForm.description.trim()}\n\nLead: ${selectedLead.title} • ${selectedLead.customerName}`
+              : `Lead: ${selectedLead.title} • ${selectedLead.customerName}`;
+
+            await addCalendarEntry({
+              title: scheduleForm.title.trim(),
+              date: isoDate,
+              type: 'task',
+              leadId: selectedLead.id,
+              description: taskDescription,
+              owner: currentUser?.name || 'System',
+              ownerId: currentUser?.id,
+              calendarId: 'default',
+            });
+
+            const taskData = {
+              id: `lead-task-${Date.now()}`,
+              title: scheduleForm.title.trim(),
+              description: scheduleForm.description.trim() || undefined,
+              assignedTo: currentUser?.id || currentUser?.email || 'System',
+              status: 'To Do' as const,
+              priority: 'Medium' as const,
+              dueDate: isoDate.split('T')[0],
+              createdFrom: 'lead_calendar' as const,
+              leadId: selectedLead.id,
+              leadTitle: selectedLead.title,
+              leadCustomerName: selectedLead.customerName,
+            };
+
+            await addTask(taskData);
+
+            await addLeadTimelineEvent(selectedLead.id, {
+              text: `Task scheduled: ${scheduleForm.title.trim()}`,
+              type: 'task',
+              user: currentUser?.name || 'System',
+              date: isoDate,
+            });
+
+            setScheduleForm({
+              title: '',
+              description: '',
+              dateTime: new Date().toISOString().slice(0, 16),
+            });
+
+            setIsAddTaskModalOpen(false);
+            alert('Task saved successfully!');
+          } catch (error) {
+            console.error('Error in task creation:', error);
+            alert('Failed to save task. Please try again.');
+          } finally {
+            setIsSavingTask(false);
+          }
+        }} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Task Title</label>
+            <input
+              required
+              type="text"
+              value={scheduleForm.title}
+              onChange={(e) =>
+                setScheduleForm((prev) => ({ ...prev, title: e.target.value }))
+              }
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              placeholder="e.g. Follow up with client"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Due Date & Time</label>
+            <input
+              required
+              type="datetime-local"
+              value={scheduleForm.dateTime}
+              onChange={(e) =>
+                setScheduleForm((prev) => ({ ...prev, dateTime: e.target.value }))
+              }
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Description (Optional)</label>
+            <textarea
+              value={scheduleForm.description}
+              onChange={(e) =>
+                setScheduleForm((prev) => ({ ...prev, description: e.target.value }))
+              }
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
+              placeholder="Add task details..."
+              rows={3}
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-3">
+            <Button type="button" variant="ghost" onClick={() => setIsAddTaskModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={!scheduleForm.title.trim() || isSavingTask}
+            >
+              {isSavingTask ? 'Adding...' : 'Add task'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Quotation Request Modal */}
       <Modal
