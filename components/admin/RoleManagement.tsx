@@ -59,6 +59,7 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
             Permission.CREATE_QUOTATION_REQUESTS,
             Permission.ASSIGN_QUOTATION_REQUESTS,
             Permission.PROCESS_QUOTATION_REQUESTS,
+            Permission.DELETE_QUOTATION_REQUESTS,
         ],
     },
     {

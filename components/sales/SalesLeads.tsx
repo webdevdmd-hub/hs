@@ -237,15 +237,26 @@ const SalesLeads: React.FC = () => {
     e.preventDefault();
     if (!selectedLead || !currentUser) return;
 
-    // Find a Sales Coordination Head to assign the request to
-    const coordinationHead = salesCoordinationHeads[0]; // Get the first one, or you could let user select
+    // Find Sales Coordination Heads - now supports multiple heads
+    const coordinationHeadsAvailable = users.filter(u =>
+      u.isActive && (
+        u.roleId === 'sales_coordination_head' ||
+        u.roleId === 'sales_manager' ||
+        u.roleId === 'assistant_sales_manager' ||
+        u.roleId === 'admin'
+      )
+    );
 
-    if (!coordinationHead) {
-      alert('No Sales Coordination Head found. Please ensure this role is assigned to a user.');
+    if (coordinationHeadsAvailable.length === 0) {
+      alert('No Sales Coordination Head found. Please ensure users with appropriate roles exist.');
       return;
     }
 
+    // Assign to the first available coordination head (or could be enhanced to let user select)
+    const assignedHead = coordinationHeadsAvailable[0];
+
     try {
+      // addQuotationRequest now automatically notifies all coordination heads
       await addQuotationRequest({
         leadId: selectedLead.id,
         leadTitle: selectedLead.title,
@@ -253,38 +264,28 @@ const SalesLeads: React.FC = () => {
         estimatedValue: selectedLead.value,
         requestedById: currentUser.id,
         requestedByName: currentUser.name,
-        assignedToHeadId: coordinationHead.id,
-        assignedToHeadName: coordinationHead.name,
+        assignedToHeadId: assignedHead.id,
+        assignedToHeadName: assignedHead.name,
         status: 'Pending',
         priority: quotationRequestFormData.priority,
         requirements: quotationRequestFormData.requirements,
         notes: quotationRequestFormData.notes,
       });
 
-      // Create instant notification for Sales Coordination Head
-      await addNotification({
-        type: 'quotation_request',
-        title: 'New Quotation Request',
-        message: `${currentUser.name} submitted a quotation request for "${selectedLead.title}" (${selectedLead.customerName}) - ${quotationRequestFormData.priority} Priority`,
-        recipientId: coordinationHead.id,
-        recipientName: coordinationHead.name,
-        senderId: currentUser.id,
-        senderName: currentUser.name,
-        relatedId: selectedLead.id,
-        relatedType: 'quotation_request',
-        actionUrl: 'quotation_requests',
-        isRead: false,
-      });
-
       // Add timeline event
       await addLeadTimelineEvent(selectedLead.id, {
-        text: `Quotation requested - Assigned to ${coordinationHead.name}`,
+        text: `Quotation request submitted - Priority: ${quotationRequestFormData.priority}`,
         type: 'activity',
         user: currentUser.name
       });
 
       setIsQuotationRequestModalOpen(false);
-      alert('Quotation request submitted successfully!');
+      setQuotationRequestFormData({
+        priority: 'Medium',
+        requirements: '',
+        notes: ''
+      });
+      alert(`Quotation request submitted successfully! All Sales Coordination Heads have been notified.`);
     } catch (error) {
       console.error('Error submitting quotation request:', error);
       alert('Failed to submit quotation request. Please try again.');

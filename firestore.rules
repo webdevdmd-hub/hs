@@ -16,7 +16,7 @@ service cloud.firestore {
     }
     function canWriteCRM() {
       let role = userRole();
-      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator']);
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'sales_coordination_head']);
     }
 
     function isManagerOrAdmin() {
@@ -24,29 +24,63 @@ service cloud.firestore {
       return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager']);
     }
 
+    function canAssignTasks() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_coordination_head', 'sales_coordinator']);
+    }
+
+    function canCreateQuotationRequest() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive']);
+    }
+
+    function canAssignQuotationRequest() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_coordination_head']);
+    }
+
+    function canProcessQuotationRequest() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_coordinator', 'sales_coordination_head']);
+    }
+
+    function canDeleteQuotationRequest() {
+      let role = userRole();
+      return isAuthed() && role != null && (role in ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_coordination_head']);
+    }
+
     // General CRM data (leads, customers, projects, etc.)
     match /crm/main/{subCollection}/{docId} {
       // Allow read for all authenticated users (filtering done in frontend)
       allow read: if isAuthed();
 
-      // Write restrictions for tasks and customers
+      // Write restrictions for tasks, customers, and quotation requests
       allow create: if canWriteCRM() && (
-        // Tasks: must assign to self unless manager/admin
-        (subCollection != 'crm_tasks' || request.resource.data.assignedTo == request.auth.uid || isManagerOrAdmin()) &&
+        // Tasks: must assign to self OR can assign tasks (managers/coordinators) OR unassigned (empty string) if can assign tasks
+        (subCollection != 'crm_tasks' || request.resource.data.assignedTo == request.auth.uid || canAssignTasks()) &&
         // Customers: must set createdById to self
-        (subCollection != 'crm_customers' || request.resource.data.createdById == request.auth.uid)
+        (subCollection != 'crm_customers' || request.resource.data.createdById == request.auth.uid) &&
+        // Quotation Requests: only sales executives and managers can create
+        (subCollection != 'crm_quotation_requests' || canCreateQuotationRequest())
       );
       allow update: if canWriteCRM() && (
-        // Tasks: must be assigned to task or manager/admin
-        (subCollection != 'crm_tasks' || resource.data.assignedTo == request.auth.uid || isManagerOrAdmin()) &&
+        // Tasks: must be assigned to current user OR can assign tasks OR unassigned task being assigned by someone who can assign
+        (subCollection != 'crm_tasks' || resource.data.assignedTo == request.auth.uid ||
+         request.resource.data.assignedTo == request.auth.uid || canAssignTasks()) &&
         // Customers: must be creator or manager/admin
-        (subCollection != 'crm_customers' || resource.data.createdById == request.auth.uid || isManagerOrAdmin())
+        (subCollection != 'crm_customers' || resource.data.createdById == request.auth.uid || isManagerOrAdmin()) &&
+        // Quotation Requests: coordination heads can assign, coordinators can process their assigned ones
+        (subCollection != 'crm_quotation_requests' || canAssignQuotationRequest() ||
+          (canProcessQuotationRequest() && resource.data.requestedById == request.auth.uid))
       );
       allow delete: if canWriteCRM() && (
-        // Tasks: must be assigned to task or manager/admin
-        (subCollection != 'crm_tasks' || resource.data.assignedTo == request.auth.uid || isManagerOrAdmin()) &&
+        // Tasks: must be assigned to current user or can assign tasks or is unassigned
+        (subCollection != 'crm_tasks' || resource.data.assignedTo == request.auth.uid ||
+         resource.data.assignedTo == '' || canAssignTasks()) &&
         // Customers: must be creator or manager/admin
-        (subCollection != 'crm_customers' || resource.data.createdById == request.auth.uid || isManagerOrAdmin())
+        (subCollection != 'crm_customers' || resource.data.createdById == request.auth.uid || isManagerOrAdmin()) &&
+        // Quotation Requests: managers, admins, and coordination heads can delete
+        (subCollection != 'crm_quotation_requests' || canDeleteQuotationRequest())
       );
     }
 

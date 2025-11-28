@@ -48,8 +48,9 @@ const MOCK_ROLES: Role[] = [
     // Quotation Request Management
     Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
     Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
+    Permission.DELETE_QUOTATION_REQUESTS,
     // Quotations and Invoices
-    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS,
+    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS, Permission.DELETE_QUOTATIONS,
     Permission.VIEW_INVOICES,
     Permission.VIEW_ACCOUNTS,
   ]},
@@ -73,8 +74,9 @@ const MOCK_ROLES: Role[] = [
     // Quotation Request Management
     Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
     Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
+    Permission.DELETE_QUOTATION_REQUESTS,
     // Quotations and Invoices
-    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS,
+    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS, Permission.DELETE_QUOTATIONS,
     Permission.VIEW_INVOICES,
     Permission.VIEW_ACCOUNTS,
   ]},
@@ -115,6 +117,30 @@ const MOCK_ROLES: Role[] = [
     Permission.VIEW_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
     // Quotation Management (can create and edit quotations)
     Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS,
+  ]},
+  { id: 'sales_coordination_head', name: 'Sales Coordination Head', permissions: [
+    Permission.VIEW_SALES_DASHBOARD,
+    // Full Lead Access
+    Permission.VIEW_LEADS, Permission.CREATE_LEADS, Permission.EDIT_LEADS, Permission.ASSIGN_LEADS,
+    Permission.CONVERT_LEADS_TO_CUSTOMERS,
+    // Full Task Access
+    Permission.VIEW_TASKS, Permission.CREATE_TASKS, Permission.EDIT_TASKS, Permission.DELETE_TASKS,
+    Permission.VIEW_ASSIGNED_TO,
+    // CRM Reports
+    Permission.VIEW_CRM_REPORTS,
+    // Calendar permissions (full access)
+    Permission.MANAGE_CRM_CALENDAR,
+    Permission.VIEW_CALENDARS, Permission.CREATE_CALENDARS, Permission.SHARE_CALENDARS,
+    Permission.MANAGE_PUBLIC_BOOKING, Permission.MANAGE_EVENT_REMINDERS,
+    Permission.USE_AVAILABILITY_FINDER, Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
+    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS,
+    // Quotation Request Management (full access to assign and process)
+    Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
+    Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
+    Permission.DELETE_QUOTATION_REQUESTS,
+    // Quotations and Invoices
+    Permission.VIEW_QUOTATIONS, Permission.CREATE_QUOTATIONS, Permission.EDIT_QUOTATIONS, Permission.DELETE_QUOTATIONS,
+    Permission.VIEW_INVOICES,
   ]},
   { id: 'accountant_head', name: 'Accountant Head', permissions: [
     Permission.VIEW_ACCOUNTS, Permission.VIEW_CUSTOMERS,
@@ -294,7 +320,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await setDoc(doc(db, "roles", role.id), {
                   name: role.name,
                   permissions: role.permissions,
-                  isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(role.id)
+                  isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'sales_coordination_head', 'accountant_head'].includes(role.id)
                 });
               }
               console.log("Default roles seeded successfully");
@@ -540,7 +566,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setDoc(roleRef, {
         name: currentRole.name,
         permissions: uniquePermissions,
-        isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(roleId)
+        isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'sales_coordination_head', 'accountant_head'].includes(roleId)
       }, { merge: true });
 
       // Real-time listener will sync any discrepancies

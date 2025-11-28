@@ -62,6 +62,7 @@ export enum Permission {
   CREATE_QUOTATION_REQUESTS = 'CREATE_QUOTATION_REQUESTS',
   ASSIGN_QUOTATION_REQUESTS = 'ASSIGN_QUOTATION_REQUESTS',
   PROCESS_QUOTATION_REQUESTS = 'PROCESS_QUOTATION_REQUESTS',
+  DELETE_QUOTATION_REQUESTS = 'DELETE_QUOTATION_REQUESTS',
 
   // Lead Conversion
   CONVERT_LEADS_TO_CUSTOMERS = 'CONVERT_LEADS_TO_CUSTOMERS',
@@ -415,6 +416,24 @@ export interface Invoice {
 // Quotation Request Management
 export type QuotationRequestStatus = 'Pending' | 'Assigned' | 'In Progress' | 'Completed' | 'Cancelled';
 
+// Predefined task tags for quotation requests
+export const PREDEFINED_QUOTATION_TAGS = [
+  'Estimate',
+  'Lux Calculation',
+  'Lighting Layout',
+  'Technical Datasheet',
+  'Material Submittal',
+  'Compliance Sheet'
+] as const;
+
+export type PredefinedQuotationTag = typeof PREDEFINED_QUOTATION_TAGS[number];
+
+export interface AssignedCoordinator {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface QuotationRequest {
   id: string;
   leadId: string;
@@ -425,12 +444,15 @@ export interface QuotationRequest {
   requestedByName: string;
   assignedToHeadId: string; // Sales Coordination Head user ID
   assignedToHeadName: string;
-  assignedToCoordinatorId?: string; // Sales Coordinator user ID (assigned by head)
-  assignedToCoordinatorName?: string;
+  assignedToCoordinatorId?: string; // Deprecated - kept for backward compatibility
+  assignedToCoordinatorName?: string; // Deprecated - kept for backward compatibility
+  assignedCoordinators?: AssignedCoordinator[]; // Multiple Sales Coordinators assigned by head
   status: QuotationRequestStatus;
   notes?: string;
   priority: 'Low' | 'Medium' | 'High' | 'Urgent';
   requirements?: string;
+  predefinedTags?: PredefinedQuotationTag[]; // Selected predefined tags
+  customTags?: string[]; // Custom tags added by head
   createdAt: string;
   updatedAt: string;
 }

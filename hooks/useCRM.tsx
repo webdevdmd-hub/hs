@@ -133,6 +133,12 @@ interface CRMContextType {
   updateQuotationRequest: (id: string, data: Partial<QuotationRequest>) => Promise<void>;
   deleteQuotationRequest: (id: string) => Promise<void>;
   assignQuotationRequestToCoordinator: (requestId: string, coordinatorId: string, coordinatorName: string) => Promise<void>;
+  assignQuotationRequestToMultipleCoordinators: (
+    requestId: string,
+    coordinators: Array<{ id: string; name: string; email: string }>,
+    tags: { predefinedTags: string[]; customTags: string[] },
+    customTasks: Array<{ title: string; description: string; priority: 'Low' | 'Medium' | 'High'; dueDate: string }>
+  ) => Promise<void>;
 
   // Calendar operations
   addCalendar: (calendar: Omit<Calendar, 'id' | 'createdAt'>) => Promise<void>;
@@ -534,8 +540,8 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
           console.log('addTask called with:', task);
 
-          // Validate required fields
-          if (!task.id || !task.title || !task.assignedTo || !task.status || !task.priority || !task.dueDate) {
+          // Validate required fields (assignedTo can be empty for unassigned tasks)
+          if (!task.id || !task.title || task.status === undefined || !task.priority || !task.dueDate) {
               const error = 'Missing required task fields';
               console.error(error, { task });
               throw new Error(error);
@@ -624,6 +630,32 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
     setQuotationRequests(prev => [newRequest, ...prev]);
     await setDoc(doc(crmSub('crm_quotation_requests'), newRequest.id), newRequest);
+
+    // Automatically notify all Sales Coordination Heads
+    const coordinationHeads = users.filter(u =>
+      u.isActive && (
+        u.roleId === 'sales_coordination_head' ||
+        u.roleId === 'sales_manager' ||
+        u.roleId === 'assistant_sales_manager' ||
+        u.roleId === 'admin'
+      )
+    );
+
+    for (const head of coordinationHeads) {
+      await addNotification({
+        type: 'quotation_request',
+        title: 'New Quotation Request Received',
+        message: `New quotation request from ${request.requestedByName} for "${request.leadTitle}" (${request.customerName}) - $${request.estimatedValue.toLocaleString()} - ${request.priority} Priority`,
+        recipientId: head.id,
+        recipientName: head.name,
+        senderId: request.requestedById,
+        senderName: request.requestedByName,
+        relatedId: request.leadId,
+        relatedType: 'quotation_request',
+        actionUrl: 'sales_quotation_requests',
+        isRead: false,
+      });
+    }
   };
 
   const updateQuotationRequest = async (id: string, data: Partial<QuotationRequest>) => {
@@ -650,6 +682,113 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       req.id === requestId ? { ...req, ...updatedData } : req
     ));
     await updateDoc(doc(crmSub('crm_quotation_requests'), requestId), updatedData);
+  };
+
+  const assignQuotationRequestToMultipleCoordinators = async (
+    requestId: string,
+    coordinators: Array<{ id: string; name: string; email: string }>,
+    tags: { predefinedTags: string[]; customTags: string[] },
+    customTasks: Array<{ title: string; description: string; priority: 'Low' | 'Medium' | 'High'; dueDate: string }>
+  ) => {
+    const request = quotationRequests.find(req => req.id === requestId);
+    if (!request) throw new Error('Quotation request not found');
+
+    const lead = leads.find(l => l.id === request.leadId);
+
+    try {
+      // Update quotation request with multiple coordinators and tags
+      const updatedData = {
+        assignedCoordinators: coordinators,
+        predefinedTags: tags.predefinedTags,
+        customTags: tags.customTags,
+        status: 'Assigned' as const,
+        updatedAt: new Date().toISOString()
+      };
+
+      await updateDoc(doc(crmSub('crm_quotation_requests'), requestId), updatedData);
+      setQuotationRequests(prev => prev.map(req =>
+        req.id === requestId ? { ...req, ...updatedData } : req
+      ));
+
+      // Create tasks and notify each coordinator
+      for (const coordinator of coordinators) {
+        const mainTaskId = `quotation-task-${Date.now()}-${coordinator.id}`;
+        const mainTask: Task = {
+          id: mainTaskId,
+          title: `Quotation Request: ${request.leadTitle}`,
+          description: `Process quotation request for ${request.customerName}.\n\nEstimated Value: $${request.estimatedValue.toLocaleString()}\n\nRequirements: ${request.requirements || 'N/A'}\n\nNotes: ${request.notes || 'N/A'}\n\nTags: ${[...tags.predefinedTags, ...tags.customTags].join(', ')}`,
+          assignedTo: coordinator.id,
+          status: 'To Do',
+          priority: request.priority === 'Urgent' ? 'High' : request.priority === 'High' ? 'High' : 'Medium',
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          createdFrom: 'quotation_request',
+          leadId: request.leadId,
+          leadTitle: request.leadTitle,
+          leadCustomerName: request.customerName,
+          quotationRequestId: request.id
+        };
+
+        await addTask(mainTask);
+
+        // Create custom subtasks
+        for (const customTask of customTasks) {
+          const subtask: Task = {
+            id: `subtask-${Date.now()}-${Math.random()}`,
+            title: customTask.title,
+            description: customTask.description,
+            assignedTo: coordinator.id,
+            status: 'To Do',
+            priority: customTask.priority,
+            dueDate: customTask.dueDate,
+            createdFrom: 'quotation_request',
+            parentTaskId: mainTaskId,
+            leadId: request.leadId,
+            leadTitle: request.leadTitle,
+            leadCustomerName: request.customerName,
+            quotationRequestId: request.id
+          };
+          await addTask(subtask);
+        }
+
+        // Notify coordinator
+        await addNotification({
+          type: 'task_assigned',
+          title: 'New Quotation Task Assigned',
+          message: `You have been assigned to process a quotation request for "${request.leadTitle}" (${request.customerName}) - ${request.priority} Priority${customTasks.length > 0 ? ` with ${customTasks.length} subtask(s)` : ''}`,
+          recipientId: coordinator.id,
+          recipientName: coordinator.name,
+          senderId: currentUser?.id,
+          senderName: currentUser?.name,
+          relatedId: request.leadId,
+          relatedType: 'quotation_request',
+          actionUrl: 'sales_tasks',
+          isRead: false,
+        });
+      }
+
+      // Notify original requester
+      await addNotification({
+        type: 'quotation_request',
+        title: 'Quotation Request Received',
+        message: `Your quotation request for "${request.leadTitle}" has been received and assigned to ${coordinators.length} coordinator(s) by Sales Coordination Head.`,
+        recipientId: request.requestedById,
+        recipientName: request.requestedByName,
+        senderId: currentUser?.id,
+        senderName: currentUser?.name,
+        relatedId: request.leadId,
+        relatedType: 'quotation_request',
+        actionUrl: 'sales_quotation_requests',
+        isRead: false,
+      });
+
+      // Update status to In Progress
+      await updateQuotationRequest(requestId, {
+        status: 'In Progress' as const
+      });
+    } catch (error) {
+      console.error('Error assigning quotation request to multiple coordinators:', error);
+      throw error;
+    }
   };
 
   // --- NOTIFICATION OPERATIONS ---
@@ -879,6 +1018,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       updateQuotationRequest,
       deleteQuotationRequest,
       assignQuotationRequestToCoordinator,
+      assignQuotationRequestToMultipleCoordinators,
       // Notification operations
       addNotification,
       markNotificationAsRead,
