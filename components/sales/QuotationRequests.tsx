@@ -783,7 +783,7 @@ const QuotationRequests: React.FC = () => {
               </p>
             </div>
 
-            {/* Existing Tasks Display */}
+            {/* Existing Tasks - Manage & Assign */}
             {(() => {
               const existingTasks = tasks?.filter(t => t.quotationRequestId === selectedRequest.id) || [];
               if (existingTasks.length > 0) {
@@ -791,22 +791,61 @@ const QuotationRequests: React.FC = () => {
                   <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                     <p className="text-xs font-semibold text-emerald-900 mb-2 uppercase flex items-center gap-1">
                       <TagIcon className="w-3 h-3" />
-                      Existing Tasks ({existingTasks.length})
+                      Existing Tasks ({existingTasks.length}) - Click to Assign
                     </p>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    <div className="space-y-1.5 max-h-60 overflow-y-auto">
                       {existingTasks.map(task => {
                         const assignee = users.find(u => u.id === task.assignedTo);
+                        const isUnassigned = !task.assignedTo;
                         return (
-                          <div key={task.id} className="bg-white rounded px-2 py-1.5 text-xs border border-emerald-200">
+                          <div
+                            key={task.id}
+                            className={`bg-white rounded px-2 py-1.5 text-xs border transition-all ${
+                              isUnassigned ? 'border-amber-300' : 'border-emerald-200'
+                            }`}
+                          >
                             <div className="flex items-start justify-between gap-2">
-                              <span className="font-medium text-slate-900 flex-1">{task.title}</span>
-                              <span className={`px-1.5 py-0.5 rounded shrink-0 ${getPriorityColor(task.priority)}`}>
-                                {task.priority}
-                              </span>
+                              <div
+                                className="flex-1 cursor-pointer"
+                                onClick={() => {
+                                  setSelectedTask(task);
+                                  setTaskAssigneeId(task.assignedTo || '');
+                                  setIsTaskAssignModalOpen(true);
+                                }}
+                              >
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <span className="font-medium text-slate-900 flex-1">{task.title}</span>
+                                  <span className={`px-1.5 py-0.5 rounded shrink-0 ${getPriorityColor(task.priority)}`}>
+                                    {task.priority}
+                                  </span>
+                                </div>
+                                <p className={`${assignee ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                  {assignee ? `✓ Assigned to ${assignee.name}` : '⚠ Click to assign coordinator'}
+                                </p>
+                              </div>
+                              <div className="flex gap-1 shrink-0">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditTaskClick(task);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                                  title="Edit Task"
+                                >
+                                  <EditIcon className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTaskClick(task.id);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                                  title="Delete Task"
+                                >
+                                  <TrashIcon className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
-                            <p className={`mt-1 ${assignee ? 'text-emerald-700' : 'text-amber-700'}`}>
-                              {assignee ? `✓ Assigned to ${assignee.name}` : '⚠ Unassigned'}
-                            </p>
                           </div>
                         );
                       })}
