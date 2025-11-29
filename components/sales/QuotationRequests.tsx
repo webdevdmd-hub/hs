@@ -104,19 +104,10 @@ const QuotationRequests: React.FC = () => {
       steps.push({ name: 'Assigned', completed: false });
     }
 
-    // Step 3: Tags Added (10%)
-    const hasTags = (request.predefinedTags?.length || 0) + (request.customTags?.length || 0) > 0;
-    if (hasTags) {
-      progress += 10;
-      steps.push({ name: 'Tags Added', completed: true });
-    } else {
-      steps.push({ name: 'Tags Added', completed: false });
-    }
-
-    // Step 4: Tasks Created (20%)
+    // Step 3: Tasks Created (30% combined - replaces old tags + tasks steps)
     const relatedTasks = tasks?.filter(t => t.quotationRequestId === request.id) || [];
     if (relatedTasks.length > 0) {
-      progress += 20;
+      progress += 30;
       steps.push({ name: `${relatedTasks.length} Task(s) Created`, completed: true });
 
       // Step 5: Tasks in Progress (15%)
@@ -594,23 +585,6 @@ const QuotationRequests: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Tags Display */}
-                {(request.predefinedTags?.length || 0) > 0 && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                      <TagIcon className="w-3 h-3" />
-                      Tags
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {request.predefinedTags?.map(tag => (
-                        <span key={tag} className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-lg border border-blue-200">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Assigned Coordinators */}
                 {request.assignedCoordinators && request.assignedCoordinators.length > 0 && (
                   <div className="mb-4">
@@ -625,93 +599,6 @@ const QuotationRequests: React.FC = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Related Tasks - Clickable to assign */}
-                {(() => {
-                  const relatedTasks = tasks?.filter(t => t.quotationRequestId === request.id) || [];
-                  if (relatedTasks.length === 0) return null;
-
-                  return (
-                    <div className="mb-4">
-                      <p className="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                        <TagIcon className="w-3 h-3" />
-                        Created Tasks ({relatedTasks.length})
-                      </p>
-                      <div className="space-y-1.5">
-                        {relatedTasks.map(task => {
-                          const assignee = users.find(u => u.id === task.assignedTo);
-                          const isUnassigned = !task.assignedTo;
-
-                          return (
-                            <div
-                              key={task.id}
-                              className={`text-xs px-2 py-1.5 rounded border transition-all ${
-                                isUnassigned
-                                  ? 'bg-amber-50 border-amber-200'
-                                  : 'bg-emerald-50 border-emerald-200'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div
-                                  className="flex-1 cursor-pointer"
-                                  onClick={() => {
-                                    if (hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS)) {
-                                      setSelectedTask(task);
-                                      setTaskAssigneeId(task.assignedTo || '');
-                                      setIsTaskAssignModalOpen(true);
-                                    }
-                                  }}
-                                >
-                                  <div className="flex items-start justify-between gap-2 mb-1">
-                                    <span className="font-medium text-slate-900 truncate flex-1">
-                                      {task.title}
-                                    </span>
-                                    <span className={`text-xs px-1.5 py-0.5 rounded ${getPriorityColor(task.priority)} shrink-0`}>
-                                      {task.priority}
-                                    </span>
-                                  </div>
-                                  {assignee ? (
-                                    <p className="text-emerald-700">
-                                      ✓ Assigned to {assignee.name}
-                                    </p>
-                                  ) : (
-                                    <p className="text-amber-700">
-                                      ⚠ Click to assign coordinator
-                                    </p>
-                                  )}
-                                </div>
-                                {hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS) && (
-                                  <div className="flex gap-1 shrink-0">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditTaskClick(task);
-                                      }}
-                                      className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
-                                      title="Edit Task"
-                                    >
-                                      <EditIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteTaskClick(task.id);
-                                      }}
-                                      className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                                      title="Delete Task"
-                                    >
-                                      <TrashIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
 
                 {/* Progress Bar */}
                 <div className="mb-4">
@@ -805,7 +692,7 @@ const QuotationRequests: React.FC = () => {
                       className="w-full !py-2 !text-sm"
                     >
                       <UsersIcon className="w-4 h-4 mr-2" />
-                      Assign to Coordinator(s)
+                      Assign & Create Tasks
                     </Button>
                   </div>
                 )}
@@ -839,14 +726,14 @@ const QuotationRequests: React.FC = () => {
           setSelectedPredefinedTags([]);
           setCustomTasks([]);
         }}
-        title="Assign Quotation Request"
+        title="Assign Coordinators & Create Tasks"
         maxWidth="lg"
       >
         {selectedRequest && (
           <div className="space-y-3">
             {/* Request Details */}
             <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-              <p className="text-xs font-semibold text-slate-700 mb-1.5 uppercase">Request Details</p>
+              <p className="text-xs font-semibold text-slate-700 mb-1.5 uppercase">Quotation Request Details</p>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                 <p className="text-slate-600">
                   <span className="font-medium">Lead:</span> {selectedRequest.leadTitle}
@@ -896,10 +783,44 @@ const QuotationRequests: React.FC = () => {
               </p>
             </div>
 
+            {/* Existing Tasks Display */}
+            {(() => {
+              const existingTasks = tasks?.filter(t => t.quotationRequestId === selectedRequest.id) || [];
+              if (existingTasks.length > 0) {
+                return (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    <p className="text-xs font-semibold text-emerald-900 mb-2 uppercase flex items-center gap-1">
+                      <TagIcon className="w-3 h-3" />
+                      Existing Tasks ({existingTasks.length})
+                    </p>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                      {existingTasks.map(task => {
+                        const assignee = users.find(u => u.id === task.assignedTo);
+                        return (
+                          <div key={task.id} className="bg-white rounded px-2 py-1.5 text-xs border border-emerald-200">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="font-medium text-slate-900 flex-1">{task.title}</span>
+                              <span className={`px-1.5 py-0.5 rounded shrink-0 ${getPriorityColor(task.priority)}`}>
+                                {task.priority}
+                              </span>
+                            </div>
+                            <p className={`mt-1 ${assignee ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              {assignee ? `✓ Assigned to ${assignee.name}` : '⚠ Unassigned'}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Predefined Tags - Task Creation Buttons */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">
-                Create Tasks from Predefined Tags
+                Create New Tasks from Predefined Tags
               </label>
               <p className="text-xs text-slate-500 mb-2">
                 Click a tag to instantly create a task. Assign coordinators by clicking on the created task.
@@ -1037,8 +958,10 @@ const QuotationRequests: React.FC = () => {
               <Button
                 onClick={handleAssignToCoordinators}
                 disabled={selectedCoordinatorIds.length === 0}
+                className="bg-emerald-600 hover:bg-emerald-700"
               >
-                Assign to {selectedCoordinatorIds.length} Coordinator{selectedCoordinatorIds.length !== 1 ? 's' : ''}
+                <CheckCircleIcon className="w-4 h-4 mr-2" />
+                Confirm Assignment & Tasks
               </Button>
             </div>
           </div>
