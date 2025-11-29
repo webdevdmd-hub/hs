@@ -243,6 +243,12 @@ const SalesLeads: React.FC = () => {
     e.preventDefault();
     if (!selectedLead || !currentUser) return;
 
+    // CRITICAL: Verify this is an actual RFQ submission, not accidental trigger
+    if (!quotationRequestFormData.requirements?.trim()) {
+      alert('Please enter requirements for the quotation request.');
+      return;
+    }
+
     // Find Sales Coordination Heads - now supports multiple heads
     const coordinationHeadsAvailable = users.filter(u =>
       u.isActive && (
@@ -278,7 +284,8 @@ const SalesLeads: React.FC = () => {
         notes: quotationRequestFormData.notes,
       });
 
-      // Automatically update lead status to 'Proposal' when RFQ is submitted
+      // CRITICAL: Only update status to 'Proposal' after successful RFQ submission
+      // This should NEVER be triggered by any other action (customer conversion, clicking names, etc.)
       await updateLeadStatus(selectedLead.id, 'Proposal');
 
       // Add timeline event
@@ -1455,15 +1462,16 @@ const SalesLeads: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Requirements</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Requirements <span className="text-red-500">*</span></label>
             <textarea
+              required
               value={quotationRequestFormData.requirements}
               onChange={(e) => setQuotationRequestFormData({
                 ...quotationRequestFormData,
                 requirements: e.target.value
               })}
               className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              placeholder="Describe the quotation requirements..."
+              placeholder="Describe the quotation requirements... (Required)"
               rows={3}
             />
           </div>
