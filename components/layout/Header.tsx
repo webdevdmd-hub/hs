@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useCRM } from '../../hooks/useCRM';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 import { LogoutIcon, MenuIcon, BellIcon, CheckCircleIcon, XIcon } from '../icons/Icons';
 import Button from '../ui/Button';
 
@@ -13,12 +14,30 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ onMenuClick, setCurrentView }) => {
   const { currentUser, logout, getRoleForUser } = useAuth();
   const { notifications, markNotificationAsRead, markAllNotificationsAsRead, deleteNotification, getUnreadNotificationCount } = useCRM();
+  const { isSupported, permission, requestPermission, revokePermission } = usePushNotifications();
   const userRole = currentUser ? getRoleForUser(currentUser) : null;
 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [showPushSettings, setShowPushSettings] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = getUnreadNotificationCount();
+
+  const handleEnablePushNotifications = async () => {
+    const token = await requestPermission();
+    if (token) {
+      alert('Push notifications enabled!');
+      setShowPushSettings(false);
+    } else {
+      alert('Failed to enable push notifications. Please check your browser settings.');
+    }
+  };
+
+  const handleDisablePushNotifications = async () => {
+    await revokePermission();
+    alert('Push notifications disabled');
+    setShowPushSettings(false);
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -101,15 +120,63 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick, setCurrentView }) => {
                   {/* Header */}
                   <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <h3 className="font-semibold text-slate-900">Notifications</h3>
-                    {unreadCount > 0 && (
-                      <button
-                        onClick={handleMarkAllAsRead}
-                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
-                      >
-                        Mark all as read
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {unreadCount > 0 && (
+                        <button
+                          onClick={handleMarkAllAsRead}
+                          className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                      {isSupported && (
+                        <button
+                          onClick={() => setShowPushSettings(!showPushSettings)}
+                          className="text-xs text-slate-600 hover:text-slate-900 font-medium"
+                          title="Push notification settings"
+                        >
+                          ⚙️
+                        </button>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Push Notification Settings */}
+                  {showPushSettings && isSupported && (
+                    <div className="px-4 py-3 bg-blue-50 border-b border-blue-200">
+                      <p className="text-xs font-semibold text-slate-900 mb-2">Push Notification Settings</p>
+                      {permission === 'default' && (
+                        <div>
+                          <p className="text-xs text-slate-600 mb-2">Get notified even when the app is closed</p>
+                          <button
+                            onClick={handleEnablePushNotifications}
+                            className="w-full px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition-colors"
+                          >
+                            Enable Push Notifications
+                          </button>
+                        </div>
+                      )}
+                      {permission === 'granted' && (
+                        <div>
+                          <p className="text-xs text-emerald-600 mb-2 flex items-center gap-1">
+                            <CheckCircleIcon className="w-4 h-4" />
+                            Push notifications enabled
+                          </p>
+                          <button
+                            onClick={handleDisablePushNotifications}
+                            className="w-full px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-medium transition-colors"
+                          >
+                            Disable Push Notifications
+                          </button>
+                        </div>
+                      )}
+                      {permission === 'denied' && (
+                        <p className="text-xs text-red-600">
+                          Push notifications are blocked. Please enable them in your browser settings.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Notification List */}
                   <div className="max-h-96 overflow-y-auto">

@@ -645,7 +645,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       await addNotification({
         type: 'quotation_request',
         title: 'New Quotation Request Received',
-        message: `New quotation request from ${request.requestedByName} for "${request.leadTitle}" (${request.customerName}) - $${request.estimatedValue.toLocaleString()} - ${request.priority} Priority`,
+        message: `New quotation request from ${request.requestedByName} for "${request.leadTitle}" (${request.customerName}) - AED ${request.estimatedValue.toLocaleString()} - ${request.priority} Priority`,
         recipientId: head.id,
         recipientName: head.name,
         senderId: request.requestedById,
@@ -716,7 +716,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const mainTask: Task = {
           id: mainTaskId,
           title: `Quotation Request: ${request.leadTitle}`,
-          description: `Process quotation request for ${request.customerName}.\n\nEstimated Value: $${request.estimatedValue.toLocaleString()}\n\nRequirements: ${request.requirements || 'N/A'}\n\nNotes: ${request.notes || 'N/A'}\n\nTags: ${[...tags.predefinedTags, ...tags.customTags].join(', ')}`,
+          description: `Process quotation request for ${request.customerName}.\n\nEstimated Value: AED ${request.estimatedValue.toLocaleString()}\n\nRequirements: ${request.requirements || 'N/A'}\n\nNotes: ${request.notes || 'N/A'}\n\nTags: ${[...tags.predefinedTags, ...tags.customTags].join(', ')}`,
           assignedTo: coordinator.id,
           status: 'To Do',
           priority: request.priority === 'Urgent' ? 'High' : request.priority === 'High' ? 'High' : 'Medium',

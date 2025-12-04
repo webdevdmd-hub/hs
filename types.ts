@@ -95,6 +95,8 @@ export interface User {
   email: string;
   roleId: string;
   isActive: boolean;
+  fcmToken?: string | null;
+  fcmTokenUpdatedAt?: string;
 }
 
 export interface Customer {
