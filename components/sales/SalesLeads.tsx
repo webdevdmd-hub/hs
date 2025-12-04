@@ -76,6 +76,9 @@ const SalesLeads: React.FC = () => {
       notes: ''
   });
 
+  // Quick Actions Menu State
+  const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
+
   // Filter assignable users (Execs, Managers, and Assistant Managers)
   const assignableUsers = useMemo(() => {
     return users.filter(u => ['sales_executive', 'sales_manager', 'assistant_sales_manager', 'admin'].includes(u.roleId));
@@ -473,24 +476,11 @@ const SalesLeads: React.FC = () => {
         ? `${scheduleForm.description.trim()}\n\nLead: ${selectedLead.title} • ${selectedLead.customerName}`
         : `Lead: ${selectedLead.title} • ${selectedLead.customerName}`;
 
-      // Step 1: Create calendar entry
-      console.log('Step 1: Creating calendar entry...');
-      await addCalendarEntry({
-        title: scheduleForm.title.trim(),
-        date: isoDate,
-        type: 'task',
-        leadId: selectedLead.id,
-        description: taskDescription,
-        owner: currentUser?.name || 'System',
-        ownerId: currentUser?.id,
-        calendarId: 'default',
-      });
-      console.log('✓ Calendar entry created');
-
-      // Step 2: Create task in main CRM Task module
-      console.log('Step 2: Creating CRM task...');
+      // Step 1: Create task in main CRM Task module first (so we have the ID for linking)
+      console.log('Step 1: Creating CRM task...');
+      const taskId = `lead-task-${Date.now()}`;
       const taskData = {
-        id: `lead-task-${Date.now()}`,
+        id: taskId,
         title: scheduleForm.title.trim(),
         description: scheduleForm.description.trim() || undefined,
         assignedTo: currentUser?.id || currentUser?.email || 'System',
@@ -506,7 +496,22 @@ const SalesLeads: React.FC = () => {
       console.log('Task data to save:', taskData);
 
       await addTask(taskData);
-      console.log('✓ CRM task created');
+      console.log('✓ CRM task created with ID:', taskId);
+
+      // Step 2: Create calendar entry linked to the task
+      console.log('Step 2: Creating calendar entry...');
+      await addCalendarEntry({
+        title: scheduleForm.title.trim(),
+        date: isoDate,
+        type: 'task',
+        leadId: selectedLead.id,
+        description: taskDescription,
+        owner: currentUser?.name || 'System',
+        ownerId: currentUser?.id,
+        calendarId: 'default',
+        linkedTaskId: taskId, // Link the calendar entry to the task
+      });
+      console.log('✓ Calendar entry created and linked to task');
 
       // Step 3: Add to lead timeline
       console.log('Step 3: Adding to lead timeline...');
@@ -1013,17 +1018,17 @@ const SalesLeads: React.FC = () => {
 
       {/* Lead Details Modal */}
       {selectedLead && leadInView && (
-        <div 
+        <div
             className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4 transition-opacity duration-300"
-            onClick={() => setIsDetailModalOpen(false)}
+            onClick={() => { setIsDetailModalOpen(false); setIsQuickActionsOpen(false); }}
             style={{ display: isDetailModalOpen ? 'flex' : 'none' }}
         >
-            <div 
-                className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto flex flex-col"
+            <div
+                className="relative w-full max-w-4xl bg-white rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                  {/* Header */}
-                 <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
+                 <div className="p-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50 flex-shrink-0">
                     <div>
                          <div className="flex items-center gap-3 mb-2">
                              <h2 className="text-2xl font-bold text-slate-900">{leadInView.title}</h2>
@@ -1048,14 +1053,16 @@ const SalesLeads: React.FC = () => {
                              )}
                          </div>
                     </div>
-                    <button onClick={() => setIsDetailModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
+                    <button onClick={() => { setIsDetailModalOpen(false); setIsQuickActionsOpen(false); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
                         <XIcon className="w-6 h-6" />
                     </button>
                  </div>
 
-                <div className="p-6 space-y-8">
-                    {/* Timeline with Action Buttons on Right */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Scrollable Content Area */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="p-6">
+                        {/* Timeline with Lead Details/Assignment on Right */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Timeline (Left Side - 2/3 width) */}
                         <div className="lg:col-span-2">
                             <h3 className="text-lg font-bold text-slate-900 mb-4">Timeline</h3>
@@ -1086,121 +1093,216 @@ const SalesLeads: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Action Buttons (Right Side - 1/3 width) */}
-                        <div className="lg:col-span-1">
-                            <h3 className="text-lg font-bold text-slate-900 mb-4">Quick Actions</h3>
-                            <div className="space-y-3">
-                              {/* Convert to Customer */}
-                              {hasPermission(Permission.CONVERT_LEADS_TO_CUSTOMERS) &&
-                               leadInView.status !== 'Won' &&
-                               leadInView.status !== 'Lost' &&
-                               !leadInView.convertedToCustomerId && (
-                                <Button
-                                  onClick={handleOpenConvertModal}
-                                  className="w-full shadow-lg shadow-emerald-200"
-                                >
-                                  <CheckCircleIcon className="w-4 h-4 mr-2" />
-                                  Convert to Customer
-                                </Button>
-                              )}
-
-                              {/* Request for Quotation */}
-                              {hasPermission(Permission.CREATE_QUOTATION_REQUESTS) &&
-                               leadInView.status !== 'Won' &&
-                               leadInView.status !== 'Lost' &&
-                               leadInView.convertedToCustomerId && (
-                                <Button
-                                  onClick={handleOpenQuotationRequestModal}
-                                  className="w-full shadow-lg shadow-emerald-200"
-                                >
-                                  <PlusIcon className="w-4 h-4 mr-2" />
-                                  Request for Quotation
-                                </Button>
-                              )}
-
-                              {/* Log Follow-up */}
-                              {hasPermission(Permission.EDIT_LEADS) && (
-                                <Button
-                                  onClick={() => setIsLogFollowupModalOpen(true)}
-                                  className="w-full shadow-lg shadow-emerald-200"
-                                >
-                                  <CalendarIcon className="w-4 h-4 mr-2" />
-                                  Log Follow-up
-                                </Button>
-                              )}
-
-                              {/* Add Task to Calendar */}
-                              {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
-                                <Button
-                                  onClick={() => setIsAddTaskModalOpen(true)}
-                                  className="w-full shadow-lg shadow-emerald-200"
-                                >
-                                  <PlusIcon className="w-4 h-4 mr-2" />
-                                  Add Task to Calendar
-                                </Button>
-                              )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Lead Details</h3>
-                            <div className="space-y-2 text-sm text-slate-700">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Value</span>
-                                    <span className="font-semibold">AED {leadInView.value.toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Source</span>
-                                    <span className="font-semibold">{leadInView.source || 'N/A'}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Created</span>
-                                    <span className="font-semibold">{new Date(leadInView.createdAt).toLocaleString()}</span>
+                        {/* Lead Details & Assignment (Right Side - 1/3 width) */}
+                        <div className="lg:col-span-1 space-y-4">
+                            {/* Lead Details */}
+                            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                                <h3 className="text-sm font-semibold text-slate-700 mb-3">Lead Details</h3>
+                                <div className="space-y-2 text-sm text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Value</span>
+                                        <span className="font-semibold">AED {leadInView.value.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Source</span>
+                                        <span className="font-semibold">{leadInView.source || 'N/A'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Created</span>
+                                        <span className="font-semibold">{new Date(leadInView.createdAt).toLocaleString()}</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        {canViewAssignedTo ? (
-                        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Assignment</h3>
-                            <div className="space-y-2 text-sm text-slate-700">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-slate-500">Assigned To</span>
-                                    <span className="font-semibold flex items-center gap-2">
-                                        <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
-                                            {getAssigneeName(leadInView.assignedTo).charAt(0)}
-                                        </span>
-                                        {getAssigneeName(leadInView.assignedTo)}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Status</span>
-                                    <span className="font-semibold">{leadInView.status}</span>
-                                </div>
-                            </div>
-                        </div>
-                        ) : (
-                        <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-                            <h3 className="text-sm font-semibold text-slate-700 mb-3">Status</h3>
-                            <div className="space-y-2 text-sm text-slate-700">
-                                <div className="flex justify-between">
-                                    <span className="text-slate-500">Current Status</span>
-                                    <span className="font-semibold">{leadInView.status}</span>
-                                </div>
-                                {leadInView.convertedToCustomerId && (
-                                    <div className="mt-3 pt-3 border-t border-emerald-200">
-                                        <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
-                                            <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
-                                            <span className="text-xs font-semibold text-emerald-700">Converted to Customer</span>
+
+                            {/* Assignment or Status */}
+                            {canViewAssignedTo ? (
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Assignment</h3>
+                                    <div className="space-y-2 text-sm text-slate-700">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-500">Assigned To</span>
+                                            <span className="font-semibold flex items-center gap-2">
+                                                <span className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">
+                                                    {getAssigneeName(leadInView.assignedTo).charAt(0)}
+                                                </span>
+                                                {getAssigneeName(leadInView.assignedTo)}
+                                            </span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Status</span>
+                                            <span className="font-semibold">{leadInView.status}</span>
                                         </div>
                                     </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                                    <h3 className="text-sm font-semibold text-slate-700 mb-3">Status</h3>
+                                    <div className="space-y-2 text-sm text-slate-700">
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Current Status</span>
+                                            <span className="font-semibold">{leadInView.status}</span>
+                                        </div>
+                                        {leadInView.convertedToCustomerId && (
+                                            <div className="mt-3 pt-3 border-t border-emerald-200">
+                                                <div className="flex items-center gap-2 p-2 bg-emerald-50 rounded-lg border border-emerald-200">
+                                                    <CheckCircleIcon className="w-4 h-4 text-emerald-600" />
+                                                    <span className="text-xs font-semibold text-emerald-700">Converted to Customer</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    </div>
+                </div>
+
+                {/* Floating Action Button (FAB) with Quick Actions Menu */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
+                    <div className="relative">
+                    {/* Backdrop for Quick Actions Menu */}
+                    {isQuickActionsOpen && (
+                        <div
+                            className="fixed inset-0 bg-transparent z-40"
+                            onClick={() => setIsQuickActionsOpen(false)}
+                        />
+                    )}
+
+                    {/* Quick Actions Menu */}
+                    {isQuickActionsOpen && (
+                        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-64 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200/50 overflow-hidden z-50" style={{
+                            animation: 'slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 15px rgba(0, 0, 0, 0.1)'
+                        }}>
+                            {/* Menu Header */}
+                            <div className="px-3 py-2 border-b border-slate-100/80 bg-gradient-to-r from-emerald-50/50 to-blue-50/50">
+                                <h4 className="text-xs font-bold text-slate-700">Quick Actions</h4>
+                                <p className="text-[10px] text-slate-500 mt-0.5">Choose an action for this lead</p>
+                            </div>
+
+                            <div className="p-2 space-y-1.5">
+                                {/* Convert to Customer - ORANGE */}
+                                {hasPermission(Permission.CONVERT_LEADS_TO_CUSTOMERS) &&
+                                 leadInView.status !== 'Won' &&
+                                 !leadInView.convertedToCustomerId && (
+                                    <button
+                                        onClick={() => {
+                                            setIsQuickActionsOpen(false);
+                                            handleOpenConvertModal();
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-orange-50 hover:to-orange-100/50 transition-all duration-200 group border border-transparent hover:border-orange-200/50 hover:shadow-md"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
+                                            <CheckCircleIcon className="w-4 h-4 text-orange-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-sm text-orange-600 group-hover:text-orange-700 transition-colors">Convert to Customer</div>
+                                            <div className="text-[10px] text-orange-500/80 mt-0.5">Create customer record</div>
+                                        </div>
+                                        <div className="text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
+                                    </button>
+                                )}
+
+                                {/* Request for Quotation */}
+                                {hasPermission(Permission.CREATE_QUOTATION_REQUESTS) &&
+                                 leadInView.status !== 'Won' &&
+                                 leadInView.status !== 'Lost' &&
+                                 leadInView.convertedToCustomerId && (
+                                    <button
+                                        onClick={() => {
+                                            setIsQuickActionsOpen(false);
+                                            handleOpenQuotationRequestModal();
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-emerald-50 hover:to-emerald-100/50 transition-all duration-200 group border border-transparent hover:border-emerald-200/50 hover:shadow-md"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
+                                            <PlusIcon className="w-4 h-4 text-emerald-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-sm text-emerald-700 group-hover:text-emerald-800 transition-colors">Request Quotation</div>
+                                            <div className="text-[10px] text-emerald-600/80 mt-0.5">Create quote request</div>
+                                        </div>
+                                        <div className="text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
+                                    </button>
+                                )}
+
+                                {/* Log Follow-up */}
+                                {hasPermission(Permission.EDIT_LEADS) && (
+                                    <button
+                                        onClick={() => {
+                                            setIsQuickActionsOpen(false);
+                                            setIsLogFollowupModalOpen(true);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100/50 transition-all duration-200 group border border-transparent hover:border-blue-200/50 hover:shadow-md"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
+                                            <CalendarIcon className="w-4 h-4 text-blue-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-sm text-blue-700 group-hover:text-blue-800 transition-colors">Log Follow-up</div>
+                                            <div className="text-[10px] text-blue-600/80 mt-0.5">Add activity note</div>
+                                        </div>
+                                        <div className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
+                                    </button>
+                                )}
+
+                                {/* Add Task to Calendar */}
+                                {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
+                                    <button
+                                        onClick={() => {
+                                            setIsQuickActionsOpen(false);
+                                            setIsAddTaskModalOpen(true);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100/50 transition-all duration-200 group border border-transparent hover:border-purple-200/50 hover:shadow-md"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
+                                            <CalendarIcon className="w-4 h-4 text-purple-600" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-sm text-purple-700 group-hover:text-purple-800 transition-colors">Add Task to Calendar</div>
+                                            <div className="text-[10px] text-purple-600/80 mt-0.5">Schedule a task</div>
+                                        </div>
+                                        <div className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
+                                    </button>
                                 )}
                             </div>
                         </div>
-                        )}
-                    </div>
+                    )}
 
+                    {/* FAB Button - Modern Design */}
+                    <button
+                        onClick={() => setIsQuickActionsOpen(!isQuickActionsOpen)}
+                        className={`group relative w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 transform hover:scale-110 active:scale-95 will-change-transform ${
+                            isQuickActionsOpen
+                                ? 'bg-gradient-to-br from-slate-600 to-slate-700 rotate-45 shadow-xl'
+                                : 'bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-2xl hover:shadow-emerald-500/50'
+                        }`}
+                        style={{
+                            boxShadow: isQuickActionsOpen
+                                ? '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)'
+                                : '0 25px 50px -12px rgba(16, 185, 129, 0.5), 0 10px 20px -5px rgba(16, 185, 129, 0.3)',
+                            backfaceVisibility: 'hidden',
+                            WebkitBackfaceVisibility: 'hidden',
+                            transform: 'translateZ(0)',
+                            WebkitTransform: 'translateZ(0)'
+                        }}
+                        aria-label="Quick Actions"
+                    >
+                        {/* Icon */}
+                        <PlusIcon className="w-7 h-7 text-white relative z-10 transition-transform duration-300" />
+
+                        {/* Subtle glow effect on hover - no animation */}
+                        <div className={`absolute -inset-1 rounded-full transition-all duration-500 ${
+                            isQuickActionsOpen
+                                ? 'opacity-0 scale-100'
+                                : 'opacity-0 group-hover:opacity-30 scale-110'
+                        }`} style={{
+                            background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, transparent 70%)',
+                            filter: 'blur(8px)'
+                        }}></div>
+                    </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1309,19 +1411,10 @@ const SalesLeads: React.FC = () => {
               ? `${scheduleForm.description.trim()}\n\nLead: ${selectedLead.title} • ${selectedLead.customerName}`
               : `Lead: ${selectedLead.title} • ${selectedLead.customerName}`;
 
-            await addCalendarEntry({
-              title: scheduleForm.title.trim(),
-              date: isoDate,
-              type: 'task',
-              leadId: selectedLead.id,
-              description: taskDescription,
-              owner: currentUser?.name || 'System',
-              ownerId: currentUser?.id,
-              calendarId: 'default',
-            });
-
+            // Create task first to get the ID
+            const taskId = `lead-task-${Date.now()}`;
             const taskData = {
-              id: `lead-task-${Date.now()}`,
+              id: taskId,
               title: scheduleForm.title.trim(),
               description: scheduleForm.description.trim() || undefined,
               assignedTo: currentUser?.id || currentUser?.email || 'System',
@@ -1335,6 +1428,19 @@ const SalesLeads: React.FC = () => {
             };
 
             await addTask(taskData);
+
+            // Then create calendar entry linked to the task
+            await addCalendarEntry({
+              title: scheduleForm.title.trim(),
+              date: isoDate,
+              type: 'task',
+              leadId: selectedLead.id,
+              description: taskDescription,
+              owner: currentUser?.name || 'System',
+              ownerId: currentUser?.id,
+              calendarId: 'default',
+              linkedTaskId: taskId, // Link the calendar entry to the task
+            });
 
             await addLeadTimelineEvent(selectedLead.id, {
               text: `Task scheduled: ${scheduleForm.title.trim()}`,

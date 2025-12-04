@@ -51,7 +51,7 @@ const AppContent: React.FC = () => {
       case 'sales_projects':
         return hasPermission(Permission.MANAGE_PROJECTS) ? <SalesProjects /> : <Placeholder title="Projects" />;
       case 'sales_tasks':
-        return hasPermission(Permission.VIEW_TASKS) ? <SalesTasks /> : <Placeholder title="Tasks" />;
+        return hasPermission(Permission.VIEW_TASKS) ? <SalesTasks setCurrentView={setCurrentView} /> : <Placeholder title="Tasks" />;
       case 'sales_quotations':
         return hasPermission(Permission.VIEW_QUOTATIONS) ? <SalesQuotations /> : <Placeholder title="Quotations" />;
       case 'sales_invoices':
@@ -67,7 +67,7 @@ const AppContent: React.FC = () => {
       case 'crm_dashboard':
         return hasPermission(Permission.VIEW_SALES_DASHBOARD) ? <SalesDashboard /> : <Placeholder title="CRM Dashboard" />;
       case 'crm_calendar':
-        return hasPermission(Permission.MANAGE_CRM_CALENDAR) ? <SalesCalendar /> : <Placeholder title="CRM Calendar" />;
+        return hasPermission(Permission.MANAGE_CRM_CALENDAR) ? <SalesCalendar setCurrentView={setCurrentView} /> : <Placeholder title="CRM Calendar" />;
       case 'crm_reports':
         return hasPermission(Permission.VIEW_CRM_REPORTS) ? <SalesReports /> : <Placeholder title="CRM Reports" />;
 

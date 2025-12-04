@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { Permission } from '../../types';
-import { HomeIcon, BriefcaseIcon, ContactIcon, LockIcon, FolderIcon, TruckIcon, PackageIcon, SettingsIcon, UsersIcon, ChevronDownIcon, XIcon, RocketIcon, DashboardIcon, CalendarIcon, DocumentIcon, CurrencyIcon } from '../icons/Icons';
+import { HomeIcon, BriefcaseIcon, ContactIcon, LockIcon, FolderIcon, TruckIcon, PackageIcon, SettingsIcon, UsersIcon, ChevronDownIcon, XIcon, RocketIcon, DashboardIcon, CalendarIcon, DocumentIcon, CurrencyIcon, CheckCircleIcon } from '../icons/Icons';
 
 interface NavLinkProps {
   icon: React.ReactNode;
@@ -115,15 +115,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isOpen, 
             </NavGroup>
           )}
           
-          {(hasPermission(Permission.VIEW_SALES_DASHBOARD) || hasPermission(Permission.VIEW_LEADS) || hasPermission(Permission.VIEW_TASKS) || hasPermission(Permission.MANAGE_CRM_CALENDAR) || hasPermission(Permission.VIEW_CRM_REPORTS)) && (
-              <NavGroup icon={<BriefcaseIcon />} label="CRM" views={['crm_', 'sales_leads', 'sales_tasks', 'crm_reports']} currentView={currentView}>
+          {(hasPermission(Permission.VIEW_SALES_DASHBOARD) || hasPermission(Permission.VIEW_LEADS) || hasPermission(Permission.MANAGE_CRM_CALENDAR) || hasPermission(Permission.VIEW_CRM_REPORTS)) && (
+              <NavGroup icon={<BriefcaseIcon />} label="CRM" views={['crm_', 'sales_leads', 'crm_reports']} currentView={currentView}>
                   {hasPermission(Permission.VIEW_SALES_DASHBOARD) && <NavLink icon={<DashboardIcon className="w-4 h-4" />} label="Dashboard" view="crm_dashboard" currentView={currentView} setCurrentView={setCurrentView} />}
                   {hasPermission(Permission.VIEW_LEADS) && <NavLink icon={<FolderIcon className="w-4 h-4"/>} label="Leads" view="sales_leads" currentView={currentView} setCurrentView={setCurrentView} />}
                   {hasPermission(Permission.MANAGE_CRM_CALENDAR) && <NavLink icon={<CalendarIcon className="w-4 h-4" />} label="Calendar" view="crm_calendar" currentView={currentView} setCurrentView={setCurrentView} />}
-                  {hasPermission(Permission.VIEW_TASKS) && <NavLink icon={<FolderIcon className="w-4 h-4"/>} label="Tasks" view="sales_tasks" currentView={currentView} setCurrentView={setCurrentView} />}
                   {hasPermission(Permission.VIEW_CRM_REPORTS) && <NavLink icon={<DocumentIcon className="w-4 h-4"/>} label="Reports" view="crm_reports" currentView={currentView} setCurrentView={setCurrentView} />}
               </NavGroup>
           )}
+
+          {hasPermission(Permission.VIEW_TASKS) && <NavLink icon={<CheckCircleIcon />} label="Tasks" view="sales_tasks" currentView={currentView} setCurrentView={setCurrentView} />}
 
           {(hasPermission(Permission.VIEW_SALES_DASHBOARD) || hasPermission(Permission.VIEW_CUSTOMERS) || hasPermission(Permission.MANAGE_PROJECTS) || hasPermission(Permission.VIEW_QUOTATIONS) || hasPermission(Permission.VIEW_INVOICES) || hasPermission(Permission.VIEW_QUOTATION_REQUESTS)) && (
             <NavGroup icon={<RocketIcon />} label="Sales" views={['sales_dashboard', 'customers', 'sales_projects', 'sales_quotations', 'sales_invoices', 'quotation_requests']} currentView={currentView}>

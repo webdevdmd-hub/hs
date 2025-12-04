@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useContext, ReactNode, useEffect, useCallback, useMemo } from 'react';
 import {
   Lead, Customer, LeadStatus, TimelineEvent, Project, Task, CalendarEvent, Quotation, Invoice,
   Calendar, CalendarShare, PublicBookingPage, Booking, UserSchedule, SharePermission, QuotationRequest,
@@ -192,6 +192,21 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [publicBookingPages, setPublicBookingPages] = useState<PublicBookingPage[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [userSchedules, setUserSchedules] = useState<UserSchedule[]>([]);
+
+  // Role-based task filtering: Admins and Sales Managers see all tasks, others see only assigned tasks
+  const filteredTasks = useMemo(() => {
+    if (!currentUser) return [];
+
+    const userRole = currentUser.roleId;
+    const isAdminOrManager = userRole === 'admin' || userRole === 'sales_manager' || userRole === 'assistant_sales_manager' || userRole === 'sales_coordination_head';
+
+    if (isAdminOrManager) {
+      return tasks; // Admin and managers see all tasks
+    }
+
+    // Other users see only tasks assigned to them
+    return tasks.filter(task => task.assignedTo === currentUser.id);
+  }, [tasks, currentUser]);
 
   const CRM_MAIN_DOC = 'main';
   const crmSub = (name: string) => collection(db, 'crm', CRM_MAIN_DOC, name);
@@ -570,10 +585,25 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateTask = async (id: string, data: Partial<Task>) => {
-      setTasks(prev => prev.map(task => 
+      setTasks(prev => prev.map(task =>
           task.id === id ? { ...task, ...data } : task
       ));
       await updateDoc(doc(crmSub('crm_tasks'), id), data);
+
+      // Two-way sync: Update linked calendar entry when task status changes
+      if (data.status !== undefined) {
+        const linkedCalendarEntry = calendarEntries.find(entry => entry.linkedTaskId === id);
+        if (linkedCalendarEntry) {
+          // Update calendar entry title to show completion status
+          const isCompleted = data.status === 'Done';
+          const titlePrefix = isCompleted ? '✓ ' : '';
+          const baseTitle = linkedCalendarEntry.title.replace(/^✓ /, ''); // Remove existing checkmark if present
+
+          await updateCalendarEntry(linkedCalendarEntry.id, {
+            title: `${titlePrefix}${baseTitle}`,
+          });
+        }
+      }
   };
 
   const deleteTask = async (id: string) => {
@@ -974,7 +1004,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       leads,
       customers,
       projects,
-      tasks,
+      tasks: filteredTasks,
       calendarEntries,
       quotations,
       invoices,

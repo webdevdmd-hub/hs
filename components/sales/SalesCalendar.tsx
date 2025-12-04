@@ -11,7 +11,11 @@ const CALENDAR_COLORS = [
   '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'
 ];
 
-const SalesCalendar: React.FC = () => {
+interface SalesCalendarProps {
+  setCurrentView?: (view: string) => void;
+}
+
+const SalesCalendar: React.FC<SalesCalendarProps> = ({ setCurrentView }) => {
   const { currentUser, hasPermission, users } = useAuth();
   const {
     calendarEntries, calendars, calendarShares, userSchedules,
@@ -837,10 +841,11 @@ const SalesCalendar: React.FC = () => {
                             const color = getEventColor(evt);
                             return (
                               <div key={evt.id} onClick={(e) => { e.stopPropagation(); handleEditEvent(evt); }}
-                                className="text-[9px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 rounded-lg truncate cursor-pointer hover:opacity-80"
+                                className="text-[9px] sm:text-[11px] px-1 sm:px-2 py-0.5 sm:py-1 rounded-lg truncate cursor-pointer hover:opacity-80 flex items-center gap-0.5"
                                 style={{ backgroundColor: `${color}20`, color: color, borderLeft: `2px solid ${color}` }} title={evt.title}>
-                                <span className="hidden sm:inline">{evt.title}</span>
-                                <span className="sm:hidden">{evt.title.slice(0, 8)}{evt.title.length > 8 ? '...' : ''}</span>
+                                {evt.linkedTaskId && <CheckCircleIcon className="w-2.5 h-2.5 flex-shrink-0" />}
+                                <span className="hidden sm:inline truncate">{evt.title}</span>
+                                <span className="sm:hidden truncate">{evt.title.slice(0, 8)}{evt.title.length > 8 ? '...' : ''}</span>
                               </div>
                             );
                           })}
@@ -1221,6 +1226,18 @@ const SalesCalendar: React.FC = () => {
                         <p className="text-xs text-amber-700 pt-2 border-t border-amber-200">
                           This task was created from the CRM Lead Details screen and is linked to the lead.
                         </p>
+                        {selectedEvent.linkedTaskId && setCurrentView && (
+                          <button
+                            onClick={() => {
+                              setCurrentView('sales_tasks');
+                              setIsDeleteConfirmOpen(false);
+                            }}
+                            className="mt-2 w-full px-3 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center justify-center gap-2"
+                          >
+                            <CheckCircleIcon className="w-4 h-4" />
+                            View Task in Task Module
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
