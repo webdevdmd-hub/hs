@@ -385,9 +385,9 @@ const SalesReports: React.FC = () => {
                     <h3 className="font-semibold text-slate-800 mb-4">Leads by Source</h3>
                     <div className="space-y-3">
                         {Object.entries(leadsBySource)
-                            .sort((a, b) => b[1] - a[1])
+                            .sort((a, b) => (b[1] as number) - (a[1] as number))
                             .map(([source, count]) => {
-                                const percentage = leadMetrics.total > 0 ? (count / leadMetrics.total) * 100 : 0;
+                                const percentage = leadMetrics.total > 0 ? ((count as number) / leadMetrics.total) * 100 : 0;
                                 return (
                                     <div key={source}>
                                         <div className="flex items-center justify-between mb-1">
