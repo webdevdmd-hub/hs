@@ -224,7 +224,7 @@ const QuotationRequests: React.FC = () => {
       const newTask: Task = {
         id: taskId,
         title: `${tag} - ${request.leadTitle}`,
-        description: `Complete ${tag} for quotation request: ${request.customerName}\n\nEstimated Value: $${request.estimatedValue.toLocaleString()}\n\nRequirements: ${request.requirements || 'N/A'}\n\nNotes: ${request.notes || 'N/A'}`,
+        description: `Complete ${tag} for quotation request: ${request.customerName}\n\nEstimated Value: AED ${request.estimatedValue.toLocaleString()}\n\nRequirements: ${request.requirements || 'N/A'}\n\nNotes: ${request.notes || 'N/A'}`,
         assignedTo: '', // Will be assigned manually by clicking the task
         status: 'To Do',
         priority: request.priority === 'Urgent' ? 'High' : request.priority === 'High' ? 'High' : 'Medium',
@@ -581,7 +581,7 @@ const QuotationRequests: React.FC = () => {
                 <div className="mb-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100">
                   <p className="text-xs text-emerald-600 font-semibold uppercase">Estimated Value</p>
                   <p className="text-2xl font-bold text-emerald-700 mt-1">
-                    ${request.estimatedValue.toLocaleString()}
+                    AED {request.estimatedValue.toLocaleString()}
                   </p>
                 </div>
 
@@ -742,7 +742,7 @@ const QuotationRequests: React.FC = () => {
                   <span className="font-medium">Customer:</span> {selectedRequest.customerName}
                 </p>
                 <p className="text-slate-600">
-                  <span className="font-medium">Value:</span> ${selectedRequest.estimatedValue.toLocaleString()}
+                  <span className="font-medium">Value:</span> AED {selectedRequest.estimatedValue.toLocaleString()}
                 </p>
                 <p className="text-slate-600">
                   <span className="font-medium">Priority:</span> {selectedRequest.priority}

@@ -419,7 +419,7 @@ const CustomerList: React.FC = () => {
                                                 </div>
                                             </div>
                                             <p className="text-2xl font-bold text-slate-900">
-                                                ${relatedData.totalRevenue.toLocaleString()}
+                                                AED {relatedData.totalRevenue.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -433,7 +433,7 @@ const CustomerList: React.FC = () => {
                                                 </div>
                                             </div>
                                             <p className="text-2xl font-bold text-slate-900">
-                                                ${relatedData.pendingRevenue.toLocaleString()}
+                                                AED {relatedData.pendingRevenue.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -560,7 +560,7 @@ const CustomerList: React.FC = () => {
                                                         }`}>
                                                             {project.status}
                                                         </span>
-                                                        <p className="text-sm font-bold text-slate-900">${project.value.toLocaleString()}</p>
+                                                        <p className="text-sm font-bold text-slate-900">AED {project.value.toLocaleString()}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -595,7 +595,7 @@ const CustomerList: React.FC = () => {
                                                         }`}>
                                                             {invoice.status}
                                                         </span>
-                                                        <p className="text-sm font-bold text-slate-900">${invoice.amount.toLocaleString()}</p>
+                                                        <p className="text-sm font-bold text-slate-900">AED {invoice.amount.toLocaleString()}</p>
                                                     </div>
                                                 </div>
                                             ))}
@@ -631,7 +631,7 @@ const CustomerList: React.FC = () => {
                                                         }`}>
                                                             {quotation.status}
                                                         </span>
-                                                        <p className="text-sm font-bold text-slate-900">${quotation.totalAmount.toLocaleString()}</p>
+                                                        <p className="text-sm font-bold text-slate-900">AED {quotation.totalAmount.toLocaleString()}</p>
                                                     </div>
                                                 </div>
                                             ))}
