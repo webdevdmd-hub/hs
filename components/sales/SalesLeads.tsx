@@ -1115,9 +1115,22 @@ const SalesLeads: React.FC = () => {
                              )}
                          </div>
                     </div>
-                    <button onClick={() => { setIsDetailModalOpen(false); setIsQuickActionsOpen(false); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
-                        <XIcon className="w-6 h-6" />
-                    </button>
+                    <div className="flex flex-col items-end gap-2">
+                        <button onClick={() => { setIsDetailModalOpen(false); setIsQuickActionsOpen(false); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
+                            <XIcon className="w-6 h-6" />
+                        </button>
+                        {/* Log Follow-up Button */}
+                        {hasPermission(Permission.EDIT_LEADS) && (
+                            <button
+                                onClick={() => setIsLogFollowupModalOpen(true)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/50 transition-all duration-200 hover:shadow-md hover:border-blue-300 group text-xs sm:text-sm"
+                            >
+                                <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+                                <span className="font-semibold text-blue-700 group-hover:text-blue-800 transition-colors hidden sm:inline">Log Follow-up</span>
+                                <span className="font-semibold text-blue-700 group-hover:text-blue-800 transition-colors sm:hidden">Follow-up</span>
+                            </button>
+                        )}
+                    </div>
                  </div>
 
                 {/* Scrollable Content Area */}
@@ -1286,26 +1299,6 @@ const SalesLeads: React.FC = () => {
                                             <div className="text-[10px] text-emerald-600/80 mt-0.5">Create quote request</div>
                                         </div>
                                         <div className="text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
-                                    </button>
-                                )}
-
-                                {/* Log Follow-up */}
-                                {hasPermission(Permission.EDIT_LEADS) && (
-                                    <button
-                                        onClick={() => {
-                                            setIsQuickActionsOpen(false);
-                                            setIsLogFollowupModalOpen(true);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100/50 transition-all duration-200 group border border-transparent hover:border-blue-200/50 hover:shadow-md"
-                                    >
-                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
-                                            <CalendarIcon className="w-4 h-4 text-blue-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="font-semibold text-sm text-blue-700 group-hover:text-blue-800 transition-colors">Log Follow-up</div>
-                                            <div className="text-[10px] text-blue-600/80 mt-0.5">Add activity note</div>
-                                        </div>
-                                        <div className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
                                     </button>
                                 )}
 

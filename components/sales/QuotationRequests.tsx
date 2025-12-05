@@ -29,6 +29,16 @@ const QuotationRequests: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [requestToDeleteId, setRequestToDeleteId] = useState<string | null>(null);
 
+  // Helper function to check if user can create unassigned tasks (matches Firestore canAssignTasks rule)
+  const canCreateUnassignedTasks = () => {
+    if (!currentUser) return false;
+    return currentUser.roleId === 'admin' ||
+           currentUser.roleId === 'sales_manager' ||
+           currentUser.roleId === 'assistant_sales_manager' ||
+           currentUser.roleId === 'sales_coordination_head' ||
+           currentUser.roleId === 'sales_coordinator';
+  };
+
   // Multiple coordinators selection - REMOVED (tasks are assigned individually now)
 
   // Task assignment modal
@@ -61,9 +71,9 @@ const QuotationRequests: React.FC = () => {
   useEffect(() => {
     if (!isAssignModalOpen || !selectedRequest || !currentUser) return;
 
-    // Only users with ASSIGN_QUOTATION_REQUESTS permission can create tasks
-    if (!hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS)) {
-      console.log('User does not have permission to create tasks');
+    // Only users who can assign tasks (based on Firestore rules: canAssignTasks function)
+    if (!canCreateUnassignedTasks()) {
+      console.log('User does not have permission to create unassigned tasks');
       return;
     }
 
@@ -119,7 +129,7 @@ const QuotationRequests: React.FC = () => {
 
     createTasksForRequestedTags();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAssignModalOpen, selectedRequest?.id, currentUser]);
+  }, [isAssignModalOpen, selectedRequest?.id, currentUser?.id, currentUser?.roleId]);
 
   // Filter quotation requests based on user role and permissions
   const filteredRequests = useMemo(() => {
@@ -281,6 +291,12 @@ const QuotationRequests: React.FC = () => {
   const handleCreateTaskFromTag = async (tag: string, request: QuotationRequest) => {
     if (!currentUser) return;
 
+    // Only users who can assign tasks (based on Firestore rules: canAssignTasks function)
+    if (!canCreateUnassignedTasks()) {
+      alert('You do not have permission to create tasks.');
+      return;
+    }
+
     try {
       const taskId = `tag-task-${Date.now()}-${Math.random()}`;
       const newTask: Task = {
@@ -354,9 +370,9 @@ const QuotationRequests: React.FC = () => {
   const handleAddCustomTask = async () => {
     if (!taskFormData.title.trim() || !selectedRequest || !currentUser) return;
 
-    // Only users with ASSIGN_QUOTATION_REQUESTS permission can create tasks
-    if (!hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS)) {
-      alert('You do not have permission to create tasks.');
+    // Only users who can assign tasks (based on Firestore rules: canAssignTasks function)
+    if (!canCreateUnassignedTasks()) {
+      alert('You do not have permission to create tasks. Only coordination heads and managers can create tasks.');
       return;
     }
 

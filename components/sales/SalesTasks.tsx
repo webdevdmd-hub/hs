@@ -111,7 +111,7 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
     };
 
     const filteredTasks = useMemo(() => {
-        return tasks.filter(task => {
+        const filtered = tasks.filter(task => {
             // Security: Only show tasks assigned to current user (unless admin/manager)
             const isOwnTask = task.assignedTo === currentUser?.id;
             const canViewTask = canViewAllTasks || isOwnTask;
@@ -133,6 +133,22 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
             }
 
             return true;
+        });
+
+        // Sort tasks: Latest first (extract timestamp from ID)
+        return filtered.sort((a, b) => {
+            // Extract timestamp from task ID (IDs contain Date.now() timestamp)
+            const getTimestamp = (id: string) => {
+                // Try to extract the timestamp from various ID formats
+                const matches = id.match(/(\d{13})/); // Match 13-digit timestamp
+                return matches ? parseInt(matches[1]) : 0;
+            };
+
+            const timestampA = getTimestamp(a.id);
+            const timestampB = getTimestamp(b.id);
+
+            // Sort in descending order (latest first)
+            return timestampB - timestampA;
         });
     }, [tasks, statusFilter, priorityFilter, selectedUserId, showOldTasks, currentUser?.id, canViewAllTasks]);
 

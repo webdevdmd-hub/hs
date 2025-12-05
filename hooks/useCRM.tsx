@@ -6,7 +6,7 @@ import {
   Notification
 } from '../types';
 import { useAuth } from './useAuth';
-import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Initial Mock Data
@@ -275,60 +275,90 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const unsubscribeCustomers = onSnapshot(crmSub('crm_customers'), (snapshot) => {
       setCustomers(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Customer) })));
+    }, (error) => {
+      console.error('Error in customers listener:', error);
     });
 
     const unsubscribeProjects = onSnapshot(crmSub('crm_projects'), (snapshot) => {
       setProjects(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Project) })));
+    }, (error) => {
+      console.error('Error in projects listener:', error);
     });
 
     const unsubscribeTasks = onSnapshot(crmSub('crm_tasks'), (snapshot) => {
       setTasks(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Task) })));
+    }, (error) => {
+      console.error('Error in tasks listener:', error);
     });
 
     const unsubscribeCalendar = onSnapshot(crmSub('crm_calendar'), (snapshot) => {
       setCalendarEntries(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as CalendarEvent) })));
+    }, (error) => {
+      console.error('Error in calendar listener:', error);
     });
 
     const unsubscribeQuotations = onSnapshot(crmSub('crm_quotations'), (snapshot) => {
       setQuotations(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Quotation) })));
+    }, (error) => {
+      console.error('Error in quotations listener:', error);
     });
 
     const unsubscribeInvoices = onSnapshot(crmSub('crm_invoices'), (snapshot) => {
       setInvoices(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Invoice) })));
+    }, (error) => {
+      console.error('Error in invoices listener:', error);
     });
 
     const unsubscribeQuotationRequests = onSnapshot(crmSub('crm_quotation_requests'), (snapshot) => {
       setQuotationRequests(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as QuotationRequest) })));
+    }, (error) => {
+      console.error('Error in quotation requests listener:', error);
     });
 
-    // Notifications - Only listen to notifications for current user
-    const unsubscribeNotifications = onSnapshot(collection(db, 'notifications'), (snapshot) => {
+    // Notifications - Only listen to notifications for current user (filter at Firestore level to avoid permission errors)
+    const notificationsQuery = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', currentUser.id)
+    );
+    const unsubscribeNotifications = onSnapshot(notificationsQuery, (snapshot) => {
       const userNotifications = snapshot.docs
         .map(d => ({ id: d.id, ...(d.data() as Notification) }))
-        .filter(n => n.recipientId === currentUser.id)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setNotifications(userNotifications);
+    }, (error) => {
+      console.error('Error listening to notifications:', error);
+      setNotifications([]);
     });
 
     // Calendar feature collections
     const unsubscribeCalendars = onSnapshot(collection(db, 'calendars'), (snapshot) => {
       setCalendars(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Calendar) })));
+    }, (error) => {
+      console.error('Error in calendars listener:', error);
     });
 
     const unsubscribeCalendarShares = onSnapshot(collection(db, 'calendar_shares'), (snapshot) => {
       setCalendarShares(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as CalendarShare) })));
+    }, (error) => {
+      console.error('Error in calendar_shares listener:', error);
     });
 
     const unsubscribeBookingPages = onSnapshot(collection(db, 'public_booking_pages'), (snapshot) => {
       setPublicBookingPages(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as PublicBookingPage) })));
+    }, (error) => {
+      console.error('Error in public_booking_pages listener:', error);
     });
 
     const unsubscribeBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
       setBookings(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Booking) })));
+    }, (error) => {
+      console.error('Error in bookings listener:', error);
     });
 
     const unsubscribeSchedules = onSnapshot(collection(db, 'user_schedules'), (snapshot) => {
       setUserSchedules(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as UserSchedule) })));
+    }, (error) => {
+      console.error('Error in user_schedules listener:', error);
     });
 
     // Cleanup function to unsubscribe from all listeners when component unmounts
