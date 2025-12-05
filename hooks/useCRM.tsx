@@ -378,8 +378,10 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addLeadTimelineEvent = async (leadId: string, event: Omit<TimelineEvent, 'id'> & { date?: string }) => {
+    // Generate unique ID with timestamp, random component, and high-precision counter to avoid duplicates
+    const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${performance.now()}`;
     const newEvent: TimelineEvent = {
-      id: Date.now().toString(),
+      id: uniqueId,
       date: event.date || new Date().toISOString(),
       ...event
     };

@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
-import { Lead, LeadStatus, Customer, Permission, QuotationRequest } from '../../types';
+import { Lead, LeadStatus, Customer, Permission, QuotationRequest, PREDEFINED_QUOTATION_TAGS, PredefinedQuotationTag } from '../../types';
 import { FilterIcon, CalendarIcon, EditIcon, TrashIcon, CheckCircleIcon, PlusIcon, XIcon, ChevronDownIcon, MoreVerticalIcon } from '../icons/Icons';
 import { useCRM } from '../../hooks/useCRM';
 import { useAuth } from '../../hooks/useAuth';
@@ -75,6 +75,11 @@ const SalesLeads: React.FC = () => {
       requirements: '',
       notes: ''
   });
+
+  // Predefined Task Tags for RFQ - using the same tags from types.ts
+  const predefinedTaskTags = [...PREDEFINED_QUOTATION_TAGS];
+
+  const [selectedTaskTags, setSelectedTaskTags] = useState<PredefinedQuotationTag[]>([]);
 
   // Quick Actions Menu State
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
@@ -238,7 +243,14 @@ const SalesLeads: React.FC = () => {
       requirements: '',
       notes: ''
     });
+    setSelectedTaskTags([]); // Clear any previously selected tags
     setIsQuotationRequestModalOpen(true);
+  };
+
+  // Close Quotation Request Modal
+  const handleCloseQuotationRequestModal = () => {
+    setIsQuotationRequestModalOpen(false);
+    setSelectedTaskTags([]); // Clear selected tags when modal is closed
   };
 
   // Submit Quotation Request
@@ -246,9 +258,9 @@ const SalesLeads: React.FC = () => {
     e.preventDefault();
     if (!selectedLead || !currentUser) return;
 
-    // CRITICAL: Verify this is an actual RFQ submission, not accidental trigger
-    if (!quotationRequestFormData.requirements?.trim()) {
-      alert('Please enter requirements for the quotation request.');
+    // Validate at least one task tag is selected
+    if (selectedTaskTags.length === 0) {
+      alert('Please select at least one task tag to continue.');
       return;
     }
 
@@ -283,7 +295,8 @@ const SalesLeads: React.FC = () => {
         assignedToHeadName: assignedHead.name,
         status: 'Pending',
         priority: quotationRequestFormData.priority,
-        requirements: quotationRequestFormData.requirements,
+        requirements: selectedTaskTags.join(', '), // Store selected task tags as requirements (for display)
+        predefinedTags: selectedTaskTags, // Store as array for proper tracking
         notes: quotationRequestFormData.notes,
       });
 
@@ -305,13 +318,62 @@ const SalesLeads: React.FC = () => {
         user: currentUser.name
       });
 
+      // Create tasks for each selected tag and auto-assign to Sales Coordination Head
+      // Only users with canAssignTasks permission can create tasks assigned to others
+      const userCanAssignTasks = currentUser.roleId === 'admin' ||
+                                  currentUser.roleId === 'sales_manager' ||
+                                  currentUser.roleId === 'assistant_sales_manager' ||
+                                  currentUser.roleId === 'sales_coordination_head' ||
+                                  currentUser.roleId === 'sales_coordinator';
+
+      let tasksCreated = 0;
+      if (userCanAssignTasks) {
+        const taskCreationPromises = selectedTaskTags.map(async (tag, index) => {
+          // Add index and random component to ensure unique IDs even when created simultaneously
+          const uniqueId = `${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`;
+          const taskId = `rfq-task-${selectedLead.id}-${tag.toLowerCase().replace(/\s+/g, '-')}-${uniqueId}`;
+          const taskData = {
+            id: taskId,
+            title: `${tag} - ${selectedLead.title}`,
+            description: `Task automatically created from RFQ for: ${selectedLead.customerName}`,
+            assignedTo: assignedHead.id, // Auto-assign to Sales Coordination Head
+            status: 'To Do' as const,
+            priority: quotationRequestFormData.priority as 'Low' | 'Medium' | 'High' | 'Urgent',
+            dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 days from now
+            createdFrom: 'quotation_request' as const,
+            leadId: selectedLead.id,
+            leadTitle: selectedLead.title,
+            leadCustomerName: selectedLead.customerName,
+          };
+
+          await addTask(taskData);
+
+          // Add timeline event for task creation
+          await addLeadTimelineEvent(selectedLead.id, {
+            text: `Task created: ${tag} (Assigned to ${assignedHead.name})`,
+            type: 'activity',
+            user: currentUser.name
+          });
+        });
+
+        // Wait for all tasks to be created
+        await Promise.all(taskCreationPromises);
+        tasksCreated = selectedTaskTags.length;
+      }
+
       setIsQuotationRequestModalOpen(false);
       setQuotationRequestFormData({
         priority: 'Medium',
         requirements: '',
         notes: ''
       });
-      alert(`Quotation request submitted successfully! Lead status updated to Proposal. All Sales Coordination Heads have been notified.`);
+      setSelectedTaskTags([]); // Clear selected tags
+
+      if (userCanAssignTasks && tasksCreated > 0) {
+        alert(`Quotation request submitted successfully! ${tasksCreated} task(s) created and assigned to ${assignedHead.name}. Lead status updated to Proposal. All Sales Coordination Heads have been notified.`);
+      } else {
+        alert(`Quotation request submitted successfully! Lead status updated to Proposal. All Sales Coordination Heads have been notified.\n\nNote: Selected task tags (${selectedTaskTags.join(', ')}) have been saved with the request. The Sales Coordination Head can create and assign tasks from the Quotation Requests view.`);
+      }
     } catch (error) {
       console.error('Error submitting quotation request:', error);
       alert('Failed to submit quotation request. Please try again.');
@@ -1518,7 +1580,7 @@ const SalesLeads: React.FC = () => {
       {/* Quotation Request Modal */}
       <Modal
         isOpen={isQuotationRequestModalOpen}
-        onClose={() => setIsQuotationRequestModalOpen(false)}
+        onClose={handleCloseQuotationRequestModal}
         title="Request for Quotation"
       >
         <form onSubmit={handleQuotationRequestSubmit} className="space-y-5">
@@ -1568,18 +1630,41 @@ const SalesLeads: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Requirements <span className="text-red-500">*</span></label>
-            <textarea
-              required
-              value={quotationRequestFormData.requirements}
-              onChange={(e) => setQuotationRequestFormData({
-                ...quotationRequestFormData,
-                requirements: e.target.value
-              })}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-              placeholder="Describe the quotation requirements... (Required)"
-              rows={3}
-            />
+            <label className="block text-xs font-semibold text-slate-700 mb-2 uppercase">Create Tasks from Predefined Tags <span className="text-red-500">*</span></label>
+            <p className="text-xs text-slate-500 mb-3">Select the tasks to be created and assigned to the Sales Coordination Head</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {predefinedTaskTags.map((tag) => (
+                <label
+                  key={tag}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 cursor-pointer transition-all duration-200 ${
+                    selectedTaskTags.includes(tag)
+                      ? 'bg-emerald-50 border-emerald-500 shadow-sm'
+                      : 'bg-slate-50 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTaskTags.includes(tag)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedTaskTags([...selectedTaskTags, tag]);
+                      } else {
+                        setSelectedTaskTags(selectedTaskTags.filter(t => t !== tag));
+                      }
+                    }}
+                    className="w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className={`text-sm font-medium ${
+                    selectedTaskTags.includes(tag) ? 'text-emerald-700' : 'text-slate-700'
+                  }`}>
+                    {tag}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {selectedTaskTags.length === 0 && (
+              <p className="text-xs text-red-500 mt-2">Please select at least one task tag to continue</p>
+            )}
           </div>
 
           <div>
@@ -1597,13 +1682,13 @@ const SalesLeads: React.FC = () => {
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <Button type="button" variant="ghost" onClick={() => setIsQuotationRequestModalOpen(false)}>
+            <Button type="button" variant="ghost" onClick={handleCloseQuotationRequestModal}>
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={salesCoordinationHeads.length === 0}
-              className={salesCoordinationHeads.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}
+              disabled={salesCoordinationHeads.length === 0 || selectedTaskTags.length === 0}
+              className={(salesCoordinationHeads.length === 0 || selectedTaskTags.length === 0) ? 'opacity-50 cursor-not-allowed' : ''}
             >
               Submit Request
             </Button>

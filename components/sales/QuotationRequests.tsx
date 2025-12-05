@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -12,7 +12,6 @@ const QuotationRequests: React.FC = () => {
   const {
     quotationRequests = [],
     updateQuotationRequest,
-    assignQuotationRequestToMultipleCoordinators,
     deleteQuotationRequest,
     leads = [],
     tasks = [],
@@ -30,8 +29,7 @@ const QuotationRequests: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [requestToDeleteId, setRequestToDeleteId] = useState<string | null>(null);
 
-  // Multiple coordinators selection
-  const [selectedCoordinatorIds, setSelectedCoordinatorIds] = useState<string[]>([]);
+  // Multiple coordinators selection - REMOVED (tasks are assigned individually now)
 
   // Task assignment modal
   const [isTaskAssignModalOpen, setIsTaskAssignModalOpen] = useState(false);
@@ -58,6 +56,70 @@ const QuotationRequests: React.FC = () => {
   // Custom tasks state
   const [customTasks, setCustomTasks] = useState<Array<{title: string; description: string; priority: 'Low' | 'Medium' | 'High'; dueDate: string}>>([]);
   const [taskFormData, setTaskFormData] = useState({ title: '', description: '', priority: 'Medium' as 'Low' | 'Medium' | 'High', dueDate: '' });
+
+  // Auto-create tasks from predefined tags when modal opens
+  useEffect(() => {
+    if (!isAssignModalOpen || !selectedRequest || !currentUser) return;
+
+    // Only users with ASSIGN_QUOTATION_REQUESTS permission can create tasks
+    if (!hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS)) {
+      console.log('User does not have permission to create tasks');
+      return;
+    }
+
+    // Check if this request has predefinedTags from sales personnel
+    const requestedTags = selectedRequest.predefinedTags || [];
+    if (requestedTags.length === 0) return;
+
+    // Get existing tasks for this quotation request
+    const existingTasks = tasks?.filter(t => t.quotationRequestId === selectedRequest.id) || [];
+
+    // Check if there are any tags that need tasks created
+    const tagsNeedingTasks = requestedTags.filter(tag =>
+      !existingTasks.some(t => t.title.startsWith(tag))
+    );
+
+    if (tagsNeedingTasks.length === 0) return;
+
+    // Create tasks for each requested tag that doesn't have a task yet
+    const createTasksForRequestedTags = async () => {
+      for (let i = 0; i < tagsNeedingTasks.length; i++) {
+        const tag = tagsNeedingTasks[i];
+
+        // Small delay between task creation to ensure unique timestamps
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+
+        // Create the task
+        const uniqueId = `${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`;
+        const taskId = `rfq-tag-task-${selectedRequest.id}-${tag.toLowerCase().replace(/\s+/g, '-')}-${uniqueId}`;
+        const newTask: Task = {
+          id: taskId,
+          title: `${tag} - ${selectedRequest.leadTitle}`,
+          description: `Complete ${tag} for quotation request: ${selectedRequest.customerName}\n\nEstimated Value: AED ${selectedRequest.estimatedValue.toLocaleString()}\n\nPriority: ${selectedRequest.priority}\n\nNotes: ${selectedRequest.notes || 'N/A'}\n\n⭐ This task was automatically created from sales personnel request.`,
+          assignedTo: '', // Unassigned - coordination head will assign
+          status: 'To Do',
+          priority: selectedRequest.priority === 'Urgent' ? 'High' : selectedRequest.priority === 'High' ? 'High' : 'Medium',
+          dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          createdFrom: 'quotation_request',
+          leadId: selectedRequest.leadId,
+          leadTitle: selectedRequest.leadTitle,
+          leadCustomerName: selectedRequest.customerName,
+          quotationRequestId: selectedRequest.id
+        };
+
+        try {
+          await addTask(newTask);
+        } catch (error) {
+          console.error(`Error creating task for tag "${tag}":`, error);
+        }
+      }
+    };
+
+    createTasksForRequestedTags();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAssignModalOpen, selectedRequest?.id, currentUser]);
 
   // Filter quotation requests based on user role and permissions
   const filteredRequests = useMemo(() => {
@@ -286,68 +348,48 @@ const QuotationRequests: React.FC = () => {
     }
   };
 
-  // Toggle predefined tag selection
-  const togglePredefinedTag = (tag: string) => {
-    setSelectedPredefinedTags(prev =>
-      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
-    );
-  };
+  // REMOVED: Toggle functions for coordinator and tag selection (no longer needed)
 
-  // Toggle coordinator selection
-  const toggleCoordinator = (coordinatorId: string) => {
-    setSelectedCoordinatorIds(prev =>
-      prev.includes(coordinatorId)
-        ? prev.filter(id => id !== coordinatorId)
-        : [...prev, coordinatorId]
-    );
-  };
+  // Add custom task to the list - creates task immediately
+  const handleAddCustomTask = async () => {
+    if (!taskFormData.title.trim() || !selectedRequest || !currentUser) return;
 
-  // Add custom task to the list
-  const handleAddCustomTask = () => {
-    if (!taskFormData.title.trim()) return;
-
-    setCustomTasks([...customTasks, { ...taskFormData }]);
-    setTaskFormData({ title: '', description: '', priority: 'Medium', dueDate: '' });
-  };
-
-  // Remove custom task
-  const handleRemoveCustomTask = (index: number) => {
-    setCustomTasks(customTasks.filter((_, i) => i !== index));
-  };
-
-  // Handle assignment to multiple coordinators
-  const handleAssignToCoordinators = async () => {
-    if (!selectedRequest || selectedCoordinatorIds.length === 0) return;
-
-    const selectedCoords = selectedCoordinatorIds
-      .map(id => {
-        const user = users.find(u => u.id === id);
-        return user ? { id: user.id, name: user.name, email: user.email } : null;
-      })
-      .filter(Boolean) as Array<{ id: string; name: string; email: string }>;
+    // Only users with ASSIGN_QUOTATION_REQUESTS permission can create tasks
+    if (!hasPermission(Permission.ASSIGN_QUOTATION_REQUESTS)) {
+      alert('You do not have permission to create tasks.');
+      return;
+    }
 
     try {
-      await assignQuotationRequestToMultipleCoordinators(
-        selectedRequest.id,
-        selectedCoords,
-        {
-          predefinedTags: selectedPredefinedTags as PredefinedQuotationTag[],
-          customTags: []
-        },
-        customTasks
-      );
+      // Create the task immediately in Firestore
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const taskId = `custom-task-${selectedRequest.id}-${uniqueId}`;
+      const newTask: Task = {
+        id: taskId,
+        title: taskFormData.title.trim(),
+        description: taskFormData.description.trim() || `Custom task for quotation request: ${selectedRequest.customerName}`,
+        assignedTo: '', // Unassigned - will be assigned by coordination head
+        status: 'To Do',
+        priority: taskFormData.priority,
+        dueDate: taskFormData.dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        createdFrom: 'quotation_request',
+        leadId: selectedRequest.leadId,
+        leadTitle: selectedRequest.leadTitle,
+        leadCustomerName: selectedRequest.customerName,
+        quotationRequestId: selectedRequest.id
+      };
 
-      // Reset form
-      setIsAssignModalOpen(false);
-      setSelectedRequest(null);
-      setSelectedCoordinatorIds([]);
-      setSelectedPredefinedTags([]);
-      setCustomTasks([]);
+      await addTask(newTask);
+
+      // Clear the form
+      setTaskFormData({ title: '', description: '', priority: 'Medium', dueDate: '' });
     } catch (error) {
-      console.error('Error assigning quotation request:', error);
-      alert('Failed to assign quotation request. Please try again.');
+      console.error('Error creating custom task:', error);
+      alert('Failed to create task. Please try again.');
     }
   };
+
+  // REMOVED: handleRemoveCustomTask and handleAssignToCoordinators (no longer needed with new workflow)
 
   // Handle status update
   const handleStatusUpdate = async (requestId: string, newStatus: QuotationRequestStatus) => {
@@ -691,8 +733,8 @@ const QuotationRequests: React.FC = () => {
                       }}
                       className="w-full !py-2 !text-sm"
                     >
-                      <UsersIcon className="w-4 h-4 mr-2" />
-                      Assign & Create Tasks
+                      <CheckCircleIcon className="w-4 h-4 mr-2" />
+                      Manage Tasks
                     </Button>
                   </div>
                 )}
@@ -722,11 +764,10 @@ const QuotationRequests: React.FC = () => {
         onClose={() => {
           setIsAssignModalOpen(false);
           setSelectedRequest(null);
-          setSelectedCoordinatorIds([]);
           setSelectedPredefinedTags([]);
           setCustomTasks([]);
         }}
-        title="Assign Coordinators & Create Tasks"
+        title="Manage Tasks & Assignments"
         maxWidth="lg"
       >
         {selectedRequest && (
@@ -748,39 +789,6 @@ const QuotationRequests: React.FC = () => {
                   <span className="font-medium">Priority:</span> {selectedRequest.priority}
                 </p>
               </div>
-            </div>
-
-            {/* Select Coordinators - Dropdown */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">
-                Select Coordinators
-              </label>
-              <select
-                multiple
-                size={Math.min(coordinators.length, 5)}
-                value={selectedCoordinatorIds}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value);
-
-                  setSelectedCoordinatorIds(selected);
-                }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-              >
-                {coordinators.length === 0 ? (
-                  <option disabled className="text-xs text-amber-600">
-                    No coordinators available
-                  </option>
-                ) : (
-                  coordinators.map(coordinator => (
-                    <option key={coordinator.id} value={coordinator.id} className="py-1.5">
-                      {coordinator.name} ({coordinator.email})
-                    </option>
-                  ))
-                )}
-              </select>
-              <p className="text-xs text-slate-500 mt-1">
-                Hold Ctrl/Cmd to select multiple coordinators. {selectedCoordinatorIds.length} selected.
-              </p>
             </div>
 
             {/* Existing Tasks - Manage & Assign */}
@@ -859,36 +867,44 @@ const QuotationRequests: React.FC = () => {
             {/* Predefined Tags - Task Creation Buttons */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">
-                Create New Tasks from Predefined Tags
+                Create Additional Tasks from Predefined Tags
               </label>
               <p className="text-xs text-slate-500 mb-2">
-                Click a tag to instantly create a task. Assign coordinators by clicking on the created task.
+                Tasks for requested tags are automatically created when you open this modal. Create additional tasks by clicking tags below.
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {PREDEFINED_QUOTATION_TAGS.map(tag => {
-                  const tagAlreadyUsed = selectedRequest?.predefinedTags?.includes(tag as PredefinedQuotationTag);
+                  // Check if this tag was requested by sales personnel (for reference/display only)
+                  const tagWasRequested = selectedRequest?.predefinedTags?.includes(tag as PredefinedQuotationTag);
+                  // Check if a task already exists for this tag
+                  const existingTasks = tasks?.filter(t => t.quotationRequestId === selectedRequest.id) || [];
+                  const taskAlreadyExists = existingTasks.some(t => t.title.startsWith(tag));
+
                   return (
                     <button
                       key={tag}
                       type="button"
                       onClick={() => handleCreateTaskFromTag(tag, selectedRequest!)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                        tagAlreadyUsed
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-300 cursor-default'
+                        taskAlreadyExists
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-300 cursor-default opacity-60'
                           : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:border-blue-300 hover:shadow-sm'
                       }`}
-                      disabled={tagAlreadyUsed}
+                      disabled={taskAlreadyExists}
+                      title={taskAlreadyExists ? (tagWasRequested ? 'Task auto-created from sales request' : 'Task already created') : 'Click to create task'}
                     >
-                      {tagAlreadyUsed && <span className="mr-1">✓</span>}
-                      <PlusIcon className="w-3 h-3 inline mr-1" />
+                      {taskAlreadyExists && <span className="mr-1">✓</span>}
+                      {taskAlreadyExists && tagWasRequested && <span className="mr-1">⭐</span>}
+                      {!taskAlreadyExists && <PlusIcon className="w-3 h-3 inline mr-1" />}
                       {tag}
                     </button>
                   );
                 })}
               </div>
               {selectedRequest?.predefinedTags && selectedRequest.predefinedTags.length > 0 && (
-                <p className="text-xs text-emerald-600 mt-2">
-                  ✓ {selectedRequest.predefinedTags.length} tag(s) already created as tasks
+                <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+                  <span>✓</span>
+                  <span>{selectedRequest.predefinedTags.length} task(s) auto-created from sales request: {selectedRequest.predefinedTags.join(', ')}</span>
                 </p>
               )}
             </div>
@@ -897,18 +913,24 @@ const QuotationRequests: React.FC = () => {
             <div className="border-t border-slate-200 pt-3">
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-xs font-semibold text-slate-700 uppercase">
-                  Additional Tasks (Optional)
+                  Add Custom Tasks
                 </label>
-                <span className="text-xs text-slate-500">{customTasks.length} task(s)</span>
+                <span className="text-xs text-slate-500">Tasks will appear in "Existing Tasks" above</span>
               </div>
 
               {/* Custom Task Form */}
-              <div className="bg-slate-50 rounded-lg p-2 space-y-1.5 mb-2">
+              <div className="bg-slate-50 rounded-lg p-2 space-y-1.5">
                 <input
                   type="text"
-                  placeholder="Task title"
+                  placeholder="Task title (required)"
                   value={taskFormData.title}
                   onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && taskFormData.title.trim()) {
+                      e.preventDefault();
+                      handleAddCustomTask();
+                    }
+                  }}
                   className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20"
                 />
                 <textarea
@@ -924,14 +946,15 @@ const QuotationRequests: React.FC = () => {
                     onChange={(e) => setTaskFormData({ ...taskFormData, priority: e.target.value as 'Low' | 'Medium' | 'High' })}
                     className="bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20"
                   >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
+                    <option value="Low">Low Priority</option>
+                    <option value="Medium">Medium Priority</option>
+                    <option value="High">High Priority</option>
                   </select>
                   <input
                     type="date"
                     value={taskFormData.dueDate}
                     onChange={(e) => setTaskFormData({ ...taskFormData, dueDate: e.target.value })}
+                    placeholder="Due date (optional)"
                     className="bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                 </div>
@@ -939,68 +962,31 @@ const QuotationRequests: React.FC = () => {
                   type="button"
                   onClick={handleAddCustomTask}
                   variant="ghost"
-                  className="w-full !py-1.5 !text-xs"
+                  className="w-full !py-1.5 !text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
                   disabled={!taskFormData.title.trim()}
                 >
                   <PlusIcon className="w-3.5 h-3.5 mr-1" />
-                  Add Task
+                  Add Task to List
                 </Button>
+                <p className="text-xs text-slate-500 italic">
+                  ℹ️ Task will be created immediately and appear in the "Existing Tasks" section above for assignment.
+                </p>
               </div>
-
-              {/* Custom Tasks List */}
-              {customTasks.length > 0 && (
-                <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                  {customTasks.map((task, index) => (
-                    <div key={index} className="bg-white border border-slate-200 rounded p-2 flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-slate-900 truncate">{task.title}</p>
-                        {task.description && (
-                          <p className="text-xs text-slate-600 truncate">{task.description}</p>
-                        )}
-                        <div className="flex gap-1.5 mt-1">
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${getPriorityColor(task.priority)}`}>
-                            {task.priority}
-                          </span>
-                          {task.dueDate && (
-                            <span className="text-xs text-slate-500">
-                              {new Date(task.dueDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleRemoveCustomTask(index)}
-                        className="text-slate-400 hover:text-red-600 transition-colors shrink-0"
-                      >
-                        <XIcon className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end pt-4">
               <Button
-                variant="ghost"
                 onClick={() => {
                   setIsAssignModalOpen(false);
                   setSelectedRequest(null);
-                  setSelectedCoordinatorIds([]);
                   setSelectedPredefinedTags([]);
                   setCustomTasks([]);
                 }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAssignToCoordinators}
-                disabled={selectedCoordinatorIds.length === 0}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >
                 <CheckCircleIcon className="w-4 h-4 mr-2" />
-                Confirm Assignment & Tasks
+                Done
               </Button>
             </div>
           </div>
