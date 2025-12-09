@@ -50,6 +50,7 @@ const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
             Permission.CREATE_CUSTOMERS,
             Permission.EDIT_CUSTOMERS,
             Permission.DELETE_CUSTOMERS,
+            Permission.ASSIGN_CUSTOMERS,
         ],
     },
     {

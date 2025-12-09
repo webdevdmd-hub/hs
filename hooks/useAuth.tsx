@@ -44,7 +44,7 @@ const MOCK_ROLES: Role[] = [
     Permission.VIEW_CALENDARS, Permission.CREATE_CALENDARS, Permission.SHARE_CALENDARS,
     Permission.MANAGE_PUBLIC_BOOKING, Permission.MANAGE_EVENT_REMINDERS,
     Permission.USE_AVAILABILITY_FINDER, Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
-    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS,
+    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS, Permission.ASSIGN_CUSTOMERS,
     // Quotation Request Management
     Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
     Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
@@ -70,7 +70,7 @@ const MOCK_ROLES: Role[] = [
     Permission.VIEW_CALENDARS, Permission.CREATE_CALENDARS, Permission.SHARE_CALENDARS,
     Permission.MANAGE_PUBLIC_BOOKING, Permission.MANAGE_EVENT_REMINDERS,
     Permission.USE_AVAILABILITY_FINDER, Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
-    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS,
+    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS, Permission.ASSIGN_CUSTOMERS,
     // Quotation Request Management
     Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
     Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,
@@ -133,7 +133,7 @@ const MOCK_ROLES: Role[] = [
     Permission.VIEW_CALENDARS, Permission.CREATE_CALENDARS, Permission.SHARE_CALENDARS,
     Permission.MANAGE_PUBLIC_BOOKING, Permission.MANAGE_EVENT_REMINDERS,
     Permission.USE_AVAILABILITY_FINDER, Permission.MANAGE_CALENDAR_TASKS, Permission.CUSTOMIZE_SCHEDULE,
-    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS,
+    Permission.VIEW_CUSTOMERS, Permission.CREATE_CUSTOMERS, Permission.EDIT_CUSTOMERS, Permission.ASSIGN_CUSTOMERS,
     // Quotation Request Management (full access to assign and process)
     Permission.VIEW_QUOTATION_REQUESTS, Permission.CREATE_QUOTATION_REQUESTS,
     Permission.ASSIGN_QUOTATION_REQUESTS, Permission.PROCESS_QUOTATION_REQUESTS,

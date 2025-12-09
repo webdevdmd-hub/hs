@@ -327,7 +327,7 @@ const CustomerList: React.FC = () => {
                                             <EditIcon className="w-4 h-4 mr-2 text-slate-400" /> Edit
                                         </button>
                                     )}
-                                    {hasPermission(Permission.EDIT_CUSTOMERS) && (
+                                    {hasPermission(Permission.ASSIGN_CUSTOMERS) && (
                                         <button
                                             onClick={() => handleOpenReassignModal(customer)}
                                             className="w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center transition-colors"
