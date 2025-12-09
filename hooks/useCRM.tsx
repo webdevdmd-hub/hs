@@ -193,20 +193,19 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [userSchedules, setUserSchedules] = useState<UserSchedule[]>([]);
 
-  // Role-based task filtering: Admins and Sales Managers see all tasks, others see only assigned tasks
+  const isAdmin = useMemo(() => currentUser?.roleId === 'admin', [currentUser]);
+
+  // Role-based task filtering: Admins see all tasks, others see only assigned tasks
   const filteredTasks = useMemo(() => {
     if (!currentUser) return [];
 
-    const userRole = currentUser.roleId;
-    const isAdminOrManager = userRole === 'admin' || userRole === 'sales_manager' || userRole === 'assistant_sales_manager' || userRole === 'sales_coordination_head';
-
-    if (isAdminOrManager) {
-      return tasks; // Admin and managers see all tasks
+    if (isAdmin) {
+      return tasks; // Admins see all tasks
     }
 
     // Other users see only tasks assigned to them
     return tasks.filter(task => task.assignedTo === currentUser.id);
-  }, [tasks, currentUser]);
+  }, [tasks, currentUser, isAdmin]);
 
   const CRM_MAIN_DOC = 'main';
   const crmSub = (name: string) => collection(db, 'crm', CRM_MAIN_DOC, name);
@@ -565,8 +564,13 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // --- PROJECT ACTIONS ---
 
   const addProject = async (project: Project) => {
-      setProjects(prev => [project, ...prev]);
-      await setDoc(doc(crmSub('crm_projects'), project.id), project);
+      const projectWithOwner: Project = {
+        ...project,
+        createdById: project.createdById || currentUser?.id || 'system_user',
+        createdByName: project.createdByName || currentUser?.name || 'System',
+      };
+      setProjects(prev => [projectWithOwner, ...prev]);
+      await setDoc(doc(crmSub('crm_projects'), projectWithOwner.id), projectWithOwner);
   };
 
   const updateProject = async (id: string, data: Partial<Project>) => {

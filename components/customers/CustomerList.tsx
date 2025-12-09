@@ -35,6 +35,11 @@ const CustomerList: React.FC = () => {
         return customers.filter(customer => customer.createdById === currentUser?.id);
     }, [customers, currentUser?.id, isManagerOrAdmin]);
 
+    const visibleProjects = useMemo(() => {
+        if (isManagerOrAdmin) return projects;
+        return projects.filter(project => project.createdById === currentUser?.id);
+    }, [projects, isManagerOrAdmin, currentUser?.id]);
+
     // Active Menus State
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
@@ -132,7 +137,7 @@ const CustomerList: React.FC = () => {
 
     // Get customer's related data
     const getCustomerRelatedData = (customerId: string) => {
-        const customerProjects = projects.filter(p => p.customerId === customerId);
+        const customerProjects = visibleProjects.filter(p => p.customerId === customerId);
         const customerInvoices = invoices.filter(inv => inv.customerId === customerId);
         const customerQuotations = quotations.filter(q => q.customerId === customerId);
 

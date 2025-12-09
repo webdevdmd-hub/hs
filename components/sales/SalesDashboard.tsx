@@ -11,8 +11,9 @@ const SalesDashboard: React.FC = () => {
   const { leads, projects, tasks } = useCRM();
 
   const userRole = currentUser ? getRoleForUser(currentUser) : null;
+  const isAdmin = userRole?.id === 'admin';
   // Treat Admin as Manager for dashboard views
-  const isManager = userRole?.id === 'sales_manager' || userRole?.id === 'admin';
+  const isManager = userRole?.id === 'sales_manager' || isAdmin;
   const isExecutive = userRole?.id === 'sales_executive';
 
   const dashboardData = useMemo(() => {
@@ -30,10 +31,13 @@ const SalesDashboard: React.FC = () => {
             t.assignedTo === currentUser.name || t.assignedTo === currentUser.email
         );
         
-        // Executives might strictly see projects they sold? 
-        // For now, we'll keep projects as a team overview for managers, 
-        // or maybe filtering by customer relationship could be added later.
-        // We will show "My Won Deals" as a proxy for project success for execs.
+        // Executives see only projects they created
+        filteredProjects = projects.filter(p => p.createdById === currentUser.id);
+    }
+
+    // Non-admin managers should also see only projects they created
+    if (!isAdmin && currentUser && !isExecutive) {
+        filteredProjects = projects.filter(p => p.createdById === currentUser.id);
     }
 
     // 2. Calculate Metrics
@@ -94,7 +98,7 @@ const SalesDashboard: React.FC = () => {
         recentActivity
     };
 
-  }, [leads, projects, tasks, isExecutive, currentUser]);
+  }, [leads, projects, tasks, isExecutive, isAdmin, currentUser]);
 
   const getGrowthPercentage = () => {
       if (dashboardData.previousMonthLeads === 0) return dashboardData.newLeadsCount > 0 ? 100 : 0;

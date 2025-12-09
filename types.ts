@@ -331,6 +331,8 @@ export interface Project {
   value: number;
   description?: string;
   progress: number; // 0-100
+  createdById?: string;
+  createdByName?: string;
 }
 
 export type TaskPriority = 'Low' | 'Medium' | 'High';

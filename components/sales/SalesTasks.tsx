@@ -14,7 +14,7 @@ interface SalesTasksProps {
 
 const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
     const { currentUser, users, hasPermission, getRoleForUser } = useAuth();
-    const { tasks, addTask, updateTask, deleteTask } = useCRM();
+    const { tasks, addTask, updateTask, deleteTask, projects } = useCRM();
 
     // Check if current user can view all tasks (admin/manager) or only their own
     const currentUserRole = currentUser ? getRoleForUser(currentUser) : null;
@@ -33,7 +33,6 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
     const [statusFilter, setStatusFilter] = useState<TaskStatus | 'All'>('All');
     const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'All'>('All');
     const [selectedUserId, setSelectedUserId] = useState<string>('all'); // User filter for managers
-    const [showOldTasks, setShowOldTasks] = useState(false); // Default to OFF (hide old tasks)
     const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
     // Save view mode preference
@@ -50,6 +49,8 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
     const [editingTask, setEditingTask] = useState<Task | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [taskToDeleteId, setTaskToDeleteId] = useState<string | null>(null);
+    const [viewTask, setViewTask] = useState<Task | null>(null);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
     // Dropdown states for form
     const [isPriorityDropdownOpen, setIsPriorityDropdownOpen] = useState(false);
@@ -88,26 +89,20 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
         return user ? user.name : idOrName;
     };
 
+    // Project visibility: only admin sees all, others see own-created projects
+    const visibleProjects = useMemo(() => {
+        if (!currentUser) return [];
+        const isAdmin = currentUser.roleId === 'admin';
+        return (projects || []).filter(p => isAdmin || p.createdById === currentUser.id);
+    }, [projects, currentUser]);
+
     // Check if user can view Assigned To functionality
     const canViewAssignedTo = hasPermission(Permission.VIEW_ASSIGNED_TO);
 
-    // Helper function to check if a task is "old"
-    // "Old tasks" are defined as COMPLETED tasks that were finished more than 7 days ago
-    // Uncompleted tasks are ALWAYS visible, regardless of due date
-    const isOldTask = (task: Task): boolean => {
-        // Only consider completed tasks as potentially "old"
-        if (task.status !== 'Done' || !task.completedAt) {
-            return false; // Uncompleted tasks are never considered "old"
-        }
-
-        // Check if completed more than 7 days ago
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const completedDate = new Date(task.completedAt);
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 7);
-
-        return completedDate < sevenDaysAgo;
+    const getProjectName = (projectId?: string) => {
+        if (!projectId) return 'N/A';
+        const project = visibleProjects.find(p => p.id === projectId);
+        return project ? project.title : 'Unknown Project';
     };
 
     const filteredTasks = useMemo(() => {
@@ -127,11 +122,6 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
             const matchPriority = priorityFilter === 'All' || task.priority === priorityFilter;
             if (!matchStatus || !matchPriority) return false;
 
-            // Filter old tasks (if toggle is OFF, hide old tasks)
-            if (!showOldTasks && isOldTask(task)) {
-                return false;
-            }
-
             return true;
         });
 
@@ -150,7 +140,7 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
             // Sort in descending order (latest first)
             return timestampB - timestampA;
         });
-    }, [tasks, statusFilter, priorityFilter, selectedUserId, showOldTasks, currentUser?.id, canViewAllTasks]);
+    }, [tasks, statusFilter, priorityFilter, selectedUserId, currentUser?.id, canViewAllTasks]);
 
     const handleOpenModal = () => {
         setEditingTask(null);
@@ -649,35 +639,6 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
                             </select>
                         </div>
                     )}
-                    <div className="flex items-center gap-3 sm:flex-shrink-0 px-2">
-                        <label className="flex items-center gap-3 cursor-pointer group">
-                            <span className="text-sm font-medium text-slate-600 whitespace-nowrap flex items-center gap-2">
-                                <ClockIcon className="w-4 h-4 text-slate-400" />
-                                Show Old Tasks
-                            </span>
-                            {/* Toggle Switch */}
-                            <div className="relative">
-                                <input
-                                    type="checkbox"
-                                    checked={showOldTasks}
-                                    onChange={(e) => setShowOldTasks(e.target.checked)}
-                                    className="sr-only peer"
-                                />
-                                {/* Track */}
-                                <div className={`
-                                    w-11 h-6 rounded-full transition-all duration-200 ease-in-out
-                                    ${showOldTasks ? 'bg-emerald-500' : 'bg-slate-300'}
-                                    peer-focus:ring-4 peer-focus:ring-emerald-200
-                                `}></div>
-                                {/* Thumb */}
-                                <div className={`
-                                    absolute top-0.5 left-0.5 bg-white rounded-full h-5 w-5
-                                    transition-transform duration-200 ease-in-out shadow-sm
-                                    ${showOldTasks ? 'translate-x-5' : 'translate-x-0'}
-                                `}></div>
-                            </div>
-                        </label>
-                    </div>
                 </div>
             </Card>
             )}
@@ -699,7 +660,14 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filteredTasks.map(task => (
-                                <tr key={task.id} className="bg-white hover:bg-slate-50/50 transition-colors">
+                                <tr
+                                    key={task.id}
+                                    className="bg-white hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setViewTask(task);
+                                        setIsViewModalOpen(true);
+                                    }}
+                                >
                                     <td className="px-6 py-4">
                                         <div className="flex items-start gap-3">
                                             <button
@@ -867,7 +835,10 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
                                         <Button 
                                             variant="ghost" 
                                             className="!p-2 text-slate-400 hover:text-slate-600"
-                                            onClick={() => setActiveMenuId(activeMenuId === task.id ? null : task.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenuId(activeMenuId === task.id ? null : task.id);
+                                            }}
                                         >
                                             <MoreVerticalIcon className="w-4 h-4"/>
                                         </Button>
@@ -876,16 +847,22 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
                                         {activeMenuId === task.id && (
                                             <div className="absolute right-8 top-8 z-20 w-40 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden text-left origin-top-right">
                                                 {hasPermission(Permission.EDIT_TASKS) && (
-                                                    <button
-                                                        onClick={() => handleOpenEditModal(task)}
-                                                        className="w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center transition-colors"
-                                                    >
-                                                        <EditIcon className="w-4 h-4 mr-2 text-slate-400" /> Edit
-                                                    </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenEditModal(task);
+                                                    }}
+                                                    className="w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center transition-colors"
+                                                >
+                                                    <EditIcon className="w-4 h-4 mr-2 text-slate-400" /> Edit
+                                                </button>
                                                 )}
                                                 {hasPermission(Permission.DELETE_TASKS) && (
                                                     <button
-                                                        onClick={() => handleDeleteClick(task.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteClick(task.id);
+                                                        }}
                                                         className="w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center transition-colors"
                                                     >
                                                         <TrashIcon className="w-4 h-4 mr-2 opacity-80" /> Delete
@@ -914,6 +891,84 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
 
             {/* Gantt Chart View */}
             {viewMode === 'gantt' && <GanttView />}
+
+            {/* View Task Modal */}
+            <Modal
+                isOpen={isViewModalOpen}
+                onClose={() => {
+                    setIsViewModalOpen(false);
+                    setViewTask(null);
+                }}
+                title={viewTask ? viewTask.title : 'Task Details'}
+                maxWidth="lg"
+            >
+                {viewTask && (
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <p className="text-xs text-slate-500 uppercase font-semibold">Assigned To</p>
+                                <p className="text-sm font-semibold text-slate-900">{getAssigneeName(viewTask.assignedTo)}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getPriorityStyle(viewTask.priority).bg} ${getPriorityStyle(viewTask.priority).text} ${getPriorityStyle(viewTask.priority).border}`}>
+                                    Priority: {viewTask.priority}
+                                </span>
+                                <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyle(viewTask.status).bg} ${getStatusStyle(viewTask.status).text} ${getStatusStyle(viewTask.status).border}`}>
+                                    {viewTask.status}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
+                            <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/60">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Due Date</p>
+                                <p className="font-semibold text-slate-900">{new Date(viewTask.dueDate).toLocaleDateString()}</p>
+                            </div>
+                            <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/60">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Recurrence</p>
+                                <p className="font-semibold text-slate-900">{viewTask.recurrence || 'None'}</p>
+                            </div>
+                        </div>
+
+                        {viewTask.description && (
+                            <div className="p-3 rounded-lg border border-slate-100 bg-white">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Description</p>
+                                <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewTask.description}</p>
+                            </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
+                            <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/60">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Lead Context</p>
+                                {viewTask.leadId ? (
+                                    <p className="font-semibold text-slate-900">{viewTask.leadTitle || 'Lead'}{viewTask.leadCustomerName ? ` • ${viewTask.leadCustomerName}` : ''}</p>
+                                ) : (
+                                    <p className="text-slate-500">No lead linked</p>
+                                )}
+                            </div>
+                            <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/60">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Project</p>
+                                <p className="font-semibold text-slate-900">{getProjectName(viewTask.projectId)}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3">
+                            {hasPermission(Permission.EDIT_TASKS) && (
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => {
+                                        setIsViewModalOpen(false);
+                                        handleOpenEditModal(viewTask);
+                                    }}
+                                >
+                                    Edit Task
+                                </Button>
+                            )}
+                            <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
 
             {/* Create/Edit Modal */}
             <Modal
@@ -1168,7 +1223,7 @@ const SalesTasks: React.FC<SalesTasksProps> = ({ setCurrentView }) => {
                                     className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
                                 >
                                     <option value="">No project</option>
-                                    {useCRM().projects.map(p => (
+                                    {visibleProjects.map(p => (
                                         <option key={p.id} value={p.id}>{p.title}</option>
                                     ))}
                                 </select>

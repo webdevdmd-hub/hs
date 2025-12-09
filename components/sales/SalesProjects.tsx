@@ -9,7 +9,7 @@ import { useCRM } from '../../hooks/useCRM';
 import { useAuth } from '../../hooks/useAuth';
 
 const SalesProjects: React.FC = () => {
-    const { hasPermission } = useAuth(); // Use if specific permissions for projects are added later
+    const { hasPermission, currentUser } = useAuth(); // Use if specific permissions for projects are added later
     const { projects, customers, addProject, updateProject, deleteProject } = useCRM();
     
     const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'All'>('All');
@@ -20,6 +20,8 @@ const SalesProjects: React.FC = () => {
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [projectToDeleteId, setProjectToDeleteId] = useState<string | null>(null);
+    const [viewProject, setViewProject] = useState<Project | null>(null);
+    const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
     // Form Data
     const [formData, setFormData] = useState({
@@ -33,9 +35,13 @@ const SalesProjects: React.FC = () => {
         progress: '0'
     });
 
-    const filteredProjects = useMemo(() => {
-        return projects.filter(proj => statusFilter === 'All' || proj.status === statusFilter);
-    }, [projects, statusFilter]);
+    const visibleProjects = useMemo(() => {
+        if (!currentUser) return [];
+        const isAdmin = currentUser.roleId === 'admin';
+        return projects
+            .filter(proj => isAdmin || proj.createdById === currentUser.id)
+            .filter(proj => statusFilter === 'All' || proj.status === statusFilter);
+    }, [projects, statusFilter, currentUser]);
 
     const handleOpenModal = () => {
         setEditingProject(null);
@@ -186,8 +192,16 @@ const SalesProjects: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filteredProjects.map(project => (
-                                <tr key={project.id} className="bg-white hover:bg-slate-50/50 transition-colors">
+                            {visibleProjects.map(project => (
+                                <tr
+                                    key={project.id}
+                                    className="bg-white hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                        setViewProject(project);
+                                        setIsViewModalOpen(true);
+                                        setActiveMenuId(null);
+                                    }}
+                                >
                                     <td className="px-6 py-4">
                                         <div className="font-medium text-slate-900">{project.title}</div>
                                         <div className="text-xs text-slate-400 truncate max-w-[200px]">{project.description}</div>
@@ -222,7 +236,10 @@ const SalesProjects: React.FC = () => {
                                         <Button 
                                             variant="ghost" 
                                             className="!p-2 text-slate-400 hover:text-slate-600"
-                                            onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveMenuId(activeMenuId === project.id ? null : project.id);
+                                            }}
                                         >
                                             <MoreVerticalIcon className="w-4 h-4"/>
                                         </Button>
@@ -231,13 +248,21 @@ const SalesProjects: React.FC = () => {
                                         {activeMenuId === project.id && (
                                             <div className="absolute right-8 top-8 z-20 w-40 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden text-left origin-top-right">
                                                 <button
-                                                    onClick={() => handleOpenEditModal(project)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleOpenEditModal(project);
+                                                        setIsViewModalOpen(false);
+                                                    }}
                                                     className="w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center transition-colors"
                                                 >
                                                     <EditIcon className="w-4 h-4 mr-2 text-slate-400" /> Edit
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDeleteClick(project.id)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteClick(project.id);
+                                                        setIsViewModalOpen(false);
+                                                    }}
                                                     className="w-full px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 flex items-center transition-colors"
                                                 >
                                                     <TrashIcon className="w-4 h-4 mr-2 opacity-80" /> Delete
@@ -247,7 +272,7 @@ const SalesProjects: React.FC = () => {
                                     </td>
                                 </tr>
                             ))}
-                            {filteredProjects.length === 0 && (
+                            {visibleProjects.length === 0 && (
                                 <tr>
                                     <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                                         No projects found.
@@ -372,6 +397,65 @@ const SalesProjects: React.FC = () => {
                         <Button type="submit">{editingProject ? 'Save Changes' : 'Create Project'}</Button>
                     </div>
                 </form>
+            </Modal>
+
+            {/* View Project Modal */}
+            <Modal
+                isOpen={isViewModalOpen}
+                onClose={() => {
+                    setIsViewModalOpen(false);
+                    setViewProject(null);
+                }}
+                title={viewProject ? viewProject.title : 'Project Details'}
+                maxWidth="lg"
+            >
+                {viewProject && (
+                    <div className="space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 font-bold">
+                                    {viewProject.title.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="text-sm text-slate-500">Customer</p>
+                                    <p className="text-base font-semibold text-slate-900">{viewProject.customerName}</p>
+                                </div>
+                            </div>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusStyle(viewProject.status)}`}>
+                                {viewProject.status}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-700">
+                            <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Timeline</p>
+                                <p><span className="text-slate-500">Start:</span> {new Date(viewProject.startDate).toLocaleDateString()}</p>
+                                <p><span className="text-slate-500">Due:</span> {viewProject.dueDate ? new Date(viewProject.dueDate).toLocaleDateString() : 'N/A'}</p>
+                            </div>
+                            <div className="p-3 rounded-lg border border-slate-100 bg-slate-50/50">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Value & Progress</p>
+                                <p className="font-semibold text-slate-900">AED {viewProject.value.toLocaleString()}</p>
+                                <div className="mt-2">
+                                    <div className="w-full bg-slate-100 rounded-full h-2">
+                                        <div className="bg-emerald-500 h-2 rounded-full" style={{ width: `${viewProject.progress}%` }} />
+                                    </div>
+                                    <p className="text-xs text-slate-500 mt-1">{viewProject.progress}% complete</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {viewProject.description && (
+                            <div className="p-3 rounded-lg border border-slate-100 bg-white">
+                                <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Description</p>
+                                <p className="text-sm text-slate-700 whitespace-pre-wrap">{viewProject.description}</p>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end">
+                            <Button onClick={() => setIsViewModalOpen(false)}>Close</Button>
+                        </div>
+                    </div>
+                )}
             </Modal>
 
             {/* Delete Confirmation Modal */}

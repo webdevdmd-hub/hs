@@ -5,7 +5,7 @@ import Button from '../ui/Button';
 import Modal from '../ui/Modal';
 import { useAuth } from '../../hooks/useAuth';
 import { Permission } from '../../types';
-import { TrashIcon } from '../icons/Icons';
+import { TrashIcon, ChevronDownIcon } from '../icons/Icons';
 
 const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
     {
@@ -108,6 +108,7 @@ const RoleManagement: React.FC = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newRoleName, setNewRoleName] = useState('');
     const [error, setError] = useState('');
+    const [openRoleIds, setOpenRoleIds] = useState<string[]>([]);
 
     const handlePermissionChange = async (roleId: string, permission: Permission, checked: boolean) => {
         try {
@@ -156,6 +157,12 @@ const RoleManagement: React.FC = () => {
         return ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(roleId);
     };
 
+    const toggleRoleOpen = (roleId: string) => {
+        setOpenRoleIds((prev) =>
+            prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]
+        );
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -172,7 +179,11 @@ const RoleManagement: React.FC = () => {
             <div className="space-y-4">
                 {roles.map(role => (
                     <Card key={role.id} className="!p-5">
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
+                        <button
+                            type="button"
+                            className="w-full flex items-center justify-between gap-3 mb-3 text-left"
+                            onClick={() => toggleRoleOpen(role.id)}
+                        >
                             <div className="flex items-center gap-3">
                                 <h3 className="font-semibold text-lg text-slate-800">{role.name}</h3>
                                 {isSystemRole(role.id) ? (
@@ -180,48 +191,54 @@ const RoleManagement: React.FC = () => {
                                 ) : (
                                     <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">Custom</span>
                                 )}
+                                <span className="text-xs text-slate-400">{role.permissions.length} permissions</span>
                             </div>
-                             <div className="flex items-center gap-3">
-                                <span className="text-xs text-slate-400">{role.permissions.length} permissions active</span>
+                            <div className="flex items-center gap-2">
                                 {!isSystemRole(role.id) && hasPermission(Permission.MANAGE_ROLES) && (
                                     <button 
-                                        onClick={() => handleDeleteRole(role.id)}
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteRole(role.id); }}
                                         className="text-slate-400 hover:text-red-600 p-1 transition-colors"
                                         title="Delete Role"
                                     >
                                         <TrashIcon className="w-4 h-4" />
                                     </button>
                                 )}
-                             </div>
-                        </div>
-                        <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                                {PERMISSION_GROUPS.map(group => (
-                                    <div key={group.label} className="rounded-lg border border-slate-100 bg-white p-3 shadow-[0_2px_4px_rgba(15,23,42,0.02)]">
-                                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
-                                            {group.label}
-                                        </div>
-                                        <div className="space-y-2">
-                                            {group.permissions.map(permission => (
-                                                <label
-                                                    key={permission}
-                                                    className={`flex items-center space-x-2 text-xs text-slate-600 select-none ${!hasPermission(Permission.MANAGE_ROLES) || role.id === 'admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-emerald-700'}`}
-                                                >
-                                                    <input
-                                                        type="checkbox"
-                                                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50 w-4 h-4"
-                                                        checked={role.permissions.includes(permission)}
-                                                        disabled={!hasPermission(Permission.MANAGE_ROLES) || role.id === 'admin'}
-                                                        onChange={(e) => handlePermissionChange(role.id, permission, e.target.checked)}
-                                                    />
-                                                    <span>{permission.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
+                                <span className={`p-2 rounded-full bg-slate-50 border border-slate-200 transition-transform ${openRoleIds.includes(role.id) ? 'rotate-180' : ''}`}>
+                                    <ChevronDownIcon className="w-4 h-4 text-slate-500" />
+                                </span>
                             </div>
-                        </div>
+                        </button>
+
+                        {openRoleIds.includes(role.id) && (
+                            <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                                    {PERMISSION_GROUPS.map(group => (
+                                        <div key={group.label} className="rounded-lg border border-slate-100 bg-white p-3 shadow-[0_2px_4px_rgba(15,23,42,0.02)]">
+                                            <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
+                                                {group.label}
+                                            </div>
+                                            <div className="space-y-2">
+                                                {group.permissions.map(permission => (
+                                                    <label
+                                                        key={permission}
+                                                        className={`flex items-center space-x-2 text-xs text-slate-600 select-none ${!hasPermission(Permission.MANAGE_ROLES) || role.id === 'admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-emerald-700'}`}
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50 w-4 h-4"
+                                                            checked={role.permissions.includes(permission)}
+                                                            disabled={!hasPermission(Permission.MANAGE_ROLES) || role.id === 'admin'}
+                                                            onChange={(e) => handlePermissionChange(role.id, permission, e.target.checked)}
+                                                        />
+                                                        <span>{permission.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </Card>
                 ))}
             </div>
