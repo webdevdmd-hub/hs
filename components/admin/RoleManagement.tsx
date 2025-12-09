@@ -177,12 +177,15 @@ const RoleManagement: React.FC = () => {
                 )}
             </div>
             <div className="space-y-4">
-                {roles.map(role => (
+                {roles.map(role => {
+                    const isOpen = openRoleIds.includes(role.id);
+                    return (
                     <Card key={role.id} className="!p-5">
                         <button
                             type="button"
                             className="w-full flex items-center justify-between gap-3 mb-3 text-left"
                             onClick={() => toggleRoleOpen(role.id)}
+                            aria-expanded={isOpen}
                         >
                             <div className="flex items-center gap-3">
                                 <h3 className="font-semibold text-lg text-slate-800">{role.name}</h3>
@@ -209,11 +212,13 @@ const RoleManagement: React.FC = () => {
                             </div>
                         </button>
 
-                        {openRoleIds.includes(role.id) && (
-                            <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-3">
+                        <div
+                            className={`overflow-hidden transition-all duration-300 ease-out ${isOpen ? 'max-h-[1600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}
+                        >
+                            <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 space-y-3 mt-2 shadow-sm transition-all duration-300">
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                                     {PERMISSION_GROUPS.map(group => (
-                                        <div key={group.label} className="rounded-lg border border-slate-100 bg-white p-3 shadow-[0_2px_4px_rgba(15,23,42,0.02)]">
+                                        <div key={group.label} className="rounded-lg border border-slate-100 bg-white p-3 shadow-[0_2px_6px_rgba(15,23,42,0.04)] transition-transform duration-200 hover:-translate-y-0.5">
                                             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500 mb-2">
                                                 {group.label}
                                             </div>
@@ -221,13 +226,13 @@ const RoleManagement: React.FC = () => {
                                                 {group.permissions.map(permission => (
                                                     <label
                                                         key={permission}
-                                                        className={`flex items-center space-x-2 text-xs text-slate-600 select-none ${!hasPermission(Permission.MANAGE_ROLES) || role.id === 'admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-emerald-700'}`}
+                                                        className={`flex items-center space-x-2 text-xs text-slate-600 select-none ${!hasPermission(Permission.MANAGE_ROLES) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-emerald-700'}`}
                                                     >
                                                         <input
                                                             type="checkbox"
                                                             className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50 w-4 h-4"
                                                             checked={role.permissions.includes(permission)}
-                                                            disabled={!hasPermission(Permission.MANAGE_ROLES) || role.id === 'admin'}
+                                                            disabled={!hasPermission(Permission.MANAGE_ROLES)}
                                                             onChange={(e) => handlePermissionChange(role.id, permission, e.target.checked)}
                                                         />
                                                         <span>{permission.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>
@@ -238,9 +243,9 @@ const RoleManagement: React.FC = () => {
                                     ))}
                                 </div>
                             </div>
-                        )}
+                        </div>
                     </Card>
-                ))}
+                )})}
             </div>
 
             <Modal

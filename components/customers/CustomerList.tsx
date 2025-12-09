@@ -9,7 +9,7 @@ import { Customer, Permission } from '../../types';
 import { MoreVerticalIcon, EditIcon, TrashIcon, XIcon, CalendarIcon, CurrencyIcon, CheckCircleIcon, ContactIcon } from '../icons/Icons';
 
 const CustomerList: React.FC = () => {
-    const { hasPermission, currentUser } = useAuth();
+    const { hasPermission, currentUser, users } = useAuth();
     const { customers, addCustomer, updateCustomer, deleteCustomer, projects, invoices, quotations } = useCRM();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,15 +25,29 @@ const CustomerList: React.FC = () => {
 
     // Check if user is manager or admin (can see all customers)
     const isManagerOrAdmin = currentUser?.roleId === 'admin' || currentUser?.roleId === 'sales_manager';
+    const [userFilter, setUserFilter] = useState<string>('all');
+    const [sortOption, setSortOption] = useState<'createdAt' | 'owner'>('createdAt');
 
     // Filter customers based on user role
     const filteredCustomers = useMemo(() => {
-        if (isManagerOrAdmin) {
-            return customers;
+        let list = customers;
+        if (!isManagerOrAdmin) {
+            list = customers.filter(customer => customer.createdById === currentUser?.id);
+        } else if (userFilter !== 'all') {
+            list = customers.filter(customer => customer.createdById === userFilter);
         }
-        // Regular users can only see customers they created
-        return customers.filter(customer => customer.createdById === currentUser?.id);
-    }, [customers, currentUser?.id, isManagerOrAdmin]);
+
+        const sorted = [...list].sort((a, b) => {
+            if (sortOption === 'owner') {
+                const aOwner = users.find(u => u.id === a.createdById)?.name || '';
+                const bOwner = users.find(u => u.id === b.createdById)?.name || '';
+                return aOwner.localeCompare(bOwner);
+            }
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+
+        return sorted;
+    }, [customers, currentUser?.id, isManagerOrAdmin, userFilter, sortOption, users]);
 
     const visibleProjects = useMemo(() => {
         if (isManagerOrAdmin) return projects;
@@ -173,6 +187,42 @@ const CustomerList: React.FC = () => {
                 <Button onClick={handleOpenModal} className="w-full sm:w-auto shadow-lg shadow-emerald-200">Add Customer</Button>
             )}
         </div>
+
+        {isManagerOrAdmin && (
+            <Card className="!p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Filter by Owner</label>
+                        <select
+                            value={userFilter}
+                            onChange={(e) => setUserFilter(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                        >
+                            <option value="all">All Users</option>
+                            {users
+                                .filter(u => u.isActive && u.roleId !== 'admin')
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map(user => (
+                                    <option key={user.id} value={user.id}>
+                                        {user.name}
+                                    </option>
+                                ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Sort</label>
+                        <select
+                            value={sortOption}
+                            onChange={(e) => setSortOption(e.target.value as 'createdAt' | 'owner')}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                        >
+                            <option value="createdAt">Newest First</option>
+                            <option value="owner">Owner Name (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+            </Card>
+        )}
         <Card className="!p-0 overflow-hidden">
              <div className="overflow-x-auto min-h-[400px]">
                 <table className="w-full text-sm text-left text-slate-600">
