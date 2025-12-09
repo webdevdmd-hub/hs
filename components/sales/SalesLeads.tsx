@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Card from '../ui/Card';
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
@@ -83,6 +83,7 @@ const SalesLeads: React.FC = () => {
 
   // Quick Actions Menu State
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
+  const quickActionsRef = useRef<HTMLDivElement | null>(null);
 
   // Filter assignable users (Execs, Managers, and Assistant Managers)
   const assignableUsers = useMemo(() => {
@@ -98,6 +99,17 @@ const SalesLeads: React.FC = () => {
   const salesCoordinationHeads = useMemo(() => {
     return users.filter(u => u.roleId === 'sales_coordination_head');
   }, [users]);
+
+  useEffect(() => {
+    if (!isQuickActionsOpen) return;
+    const handleClickAway = (e: MouseEvent) => {
+      if (quickActionsRef.current && !quickActionsRef.current.contains(e.target as Node)) {
+        setIsQuickActionsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickAway);
+    return () => document.removeEventListener('mousedown', handleClickAway);
+  }, [isQuickActionsOpen]);
 
   const getAssigneeName = (userId: string) => {
     if (userId === 'system_user') return 'System';
@@ -1119,17 +1131,6 @@ const SalesLeads: React.FC = () => {
                         <button onClick={() => { setIsDetailModalOpen(false); setIsQuickActionsOpen(false); }} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600">
                             <XIcon className="w-6 h-6" />
                         </button>
-                        {/* Log Follow-up Button */}
-                        {hasPermission(Permission.EDIT_LEADS) && (
-                            <button
-                                onClick={() => setIsLogFollowupModalOpen(true)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/50 transition-all duration-200 hover:shadow-md hover:border-blue-300 group text-xs sm:text-sm"
-                            >
-                                <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
-                                <span className="font-semibold text-blue-700 group-hover:text-blue-800 transition-colors hidden sm:inline">Log Follow-up</span>
-                                <span className="font-semibold text-blue-700 group-hover:text-blue-800 transition-colors sm:hidden">Follow-up</span>
-                            </button>
-                        )}
                     </div>
                  </div>
 
@@ -1228,6 +1229,27 @@ const SalesLeads: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Add Task to Calendar - placed below status */}
+                            {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
+                                <div className="rounded-xl border border-purple-100 bg-purple-50/60 p-4 flex items-center justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-sm">
+                                            <CalendarIcon className="w-5 h-5 text-purple-700" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-semibold text-purple-800">Add Task to Calendar</p>
+                                            <p className="text-xs text-purple-700/80">Schedule next steps for this lead.</p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        onClick={() => setIsAddTaskModalOpen(true)}
+                                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                                    >
+                                        Add Task
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </div>
                     </div>
@@ -1235,7 +1257,7 @@ const SalesLeads: React.FC = () => {
 
                 {/* Floating Action Button (FAB) with Quick Actions Menu */}
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
-                    <div className="relative">
+                    <div className="relative" ref={quickActionsRef}>
                     {/* Backdrop for Quick Actions Menu */}
                     {isQuickActionsOpen && (
                         <div
@@ -1246,17 +1268,40 @@ const SalesLeads: React.FC = () => {
 
                     {/* Quick Actions Menu */}
                     {isQuickActionsOpen && (
-                        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-64 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200/50 overflow-hidden z-50" style={{
+                        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-72 bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200/50 overflow-hidden z-50" style={{
                             animation: 'slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 15px rgba(0, 0, 0, 0.1)'
                         }}>
                             {/* Menu Header */}
-                            <div className="px-3 py-2 border-b border-slate-100/80 bg-gradient-to-r from-emerald-50/50 to-blue-50/50">
-                                <h4 className="text-xs font-bold text-slate-700">Quick Actions</h4>
-                                <p className="text-[10px] text-slate-500 mt-0.5">Choose an action for this lead</p>
+                            <div className="px-3 py-2 border-b border-slate-100/80 bg-gradient-to-r from-emerald-50/50 via-blue-50 to-slate-50 flex items-center justify-between">
+                                <div>
+                                  <h4 className="text-xs font-bold text-slate-700">Quick Actions</h4>
+                                  <p className="text-[10px] text-slate-500 mt-0.5">Act instantly to move this lead forward</p>
+                                </div>
+                                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full border border-emerald-200">Live</span>
                             </div>
 
                             <div className="p-2 space-y-1.5">
+                                {/* Log Follow-up */}
+                                {hasPermission(Permission.EDIT_LEADS) && (
+                                    <button
+                                        onClick={() => {
+                                            setIsQuickActionsOpen(false);
+                                            setIsLogFollowupModalOpen(true);
+                                        }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100/50 transition-all duration-200 group border border-transparent hover:border-blue-200/60 hover:shadow-md"
+                                    >
+                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
+                                            <EditIcon className="w-4 h-4 text-blue-700" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="font-semibold text-sm text-blue-700 group-hover:text-blue-800 transition-colors">Log Follow-up</div>
+                                            <div className="text-[10px] text-blue-600/80 mt-0.5">Capture your latest touchpoint</div>
+                                        </div>
+                                        <div className="text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
+                                    </button>
+                                )}
+
                                 {/* Convert to Customer - ORANGE */}
                                 {hasPermission(Permission.CONVERT_LEADS_TO_CUSTOMERS) &&
                                  leadInView.status !== 'Won' &&
@@ -1302,25 +1347,6 @@ const SalesLeads: React.FC = () => {
                                     </button>
                                 )}
 
-                                {/* Add Task to Calendar */}
-                                {hasPermission(Permission.MANAGE_CRM_CALENDAR) && (
-                                    <button
-                                        onClick={() => {
-                                            setIsQuickActionsOpen(false);
-                                            setIsAddTaskModalOpen(true);
-                                        }}
-                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-lg hover:bg-gradient-to-r hover:from-purple-50 hover:to-purple-100/50 transition-all duration-200 group border border-transparent hover:border-purple-200/50 hover:shadow-md"
-                                    >
-                                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm">
-                                            <CalendarIcon className="w-4 h-4 text-purple-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="font-semibold text-sm text-purple-700 group-hover:text-purple-800 transition-colors">Add Task to Calendar</div>
-                                            <div className="text-[10px] text-purple-600/80 mt-0.5">Schedule a task</div>
-                                        </div>
-                                        <div className="text-purple-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs">→</div>
-                                    </button>
-                                )}
                             </div>
                         </div>
                     )}
