@@ -109,6 +109,11 @@ export interface Customer {
   source: string;
   createdAt: string;
   createdById: string;
+  salespersonId: string; // Current owning salesperson (for visibility/ownership)
+  salespersonName?: string;
+  originalSalespersonId: string; // First salesperson who brought in/converted the customer
+  originalSalespersonName?: string;
+  lastReassignedAt?: string;
 }
 
 export type LeadStatus = 'New' | 'Contacted' | 'Proposal' | 'Negotiation' | 'Won' | 'Lost';

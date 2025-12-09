@@ -59,16 +59,16 @@ const INITIAL_LEADS: Lead[] = [
 ];
 
 const INITIAL_CUSTOMERS: Customer[] = [
-  { id: '1', name: 'GreenScape Solutions', contactPerson: 'Alice Green', email: 'alice@greenscape.com', phone: '555-0101', status: 'Active', source: 'Referral', createdAt: '2023-05-12', createdById: 'system_user' },
-  { id: '2', name: 'EcoBuild Corp', contactPerson: 'Bob Builder', email: 'bob@ecobuild.com', phone: '555-0102', status: 'Active', source: 'LinkedIn', createdAt: '2023-02-20', createdById: 'system_user' },
-  { id: '3', name: 'NatureFirst Inc.', contactPerson: 'Carol Woods', email: 'carol@naturefirst.com', phone: '555-0103', status: 'From Lead', source: 'Cold Call', createdAt: '2023-08-01', createdById: 'system_user' },
-  { id: '4', name: 'Sustainable Structures', contactPerson: 'David Stone', email: 'david@sustain.com', phone: '555-0104', status: 'Inactive', source: 'Website', createdAt: '2022-11-30', createdById: 'system_user' },
-  { id: '5', name: 'TechFlow Systems', contactPerson: 'Sarah Jenkins', email: 'sarah@techflow.com', phone: '555-0105', status: 'Active', source: 'Email Campaign', createdAt: '2023-09-15', createdById: 'system_user' },
-  { id: '6', name: 'GrowthWorks', contactPerson: 'Mike Ross', email: 'mike@growthworks.com', phone: '555-0106', status: 'From Lead', source: 'Referral', createdAt: '2023-10-05', createdById: 'system_user' },
-  { id: '7', name: 'SafeGuard', contactPerson: 'Emily Blunt', email: 'emily@safeguard.com', phone: '555-0107', status: 'From Lead', source: 'Exhibition', createdAt: '2023-11-01', createdById: 'system_user' },
-  { id: '8', name: 'FastTrack Logistics', contactPerson: 'Tom Speed', email: 'tom@fasttrack.com', phone: '555-0108', status: 'Active', source: 'LinkedIn', createdAt: '2023-07-22', createdById: 'system_user' },
-  { id: '9', name: 'BlueSky Innovations', contactPerson: 'Jessica Sky', email: 'jessica@bluesky.com', phone: '555-0109', status: 'Inactive', source: 'Other', createdAt: '2023-01-10', createdById: 'system_user' },
-  { id: '10', name: 'Urban Developers', contactPerson: 'Gary Steel', email: 'gary@urban.com', phone: '555-0110', status: 'Active', source: 'Website', createdAt: '2023-06-18', createdById: 'system_user' },
+  { id: '1', name: 'GreenScape Solutions', contactPerson: 'Alice Green', email: 'alice@greenscape.com', phone: '555-0101', status: 'Active', source: 'Referral', createdAt: '2023-05-12', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '2', name: 'EcoBuild Corp', contactPerson: 'Bob Builder', email: 'bob@ecobuild.com', phone: '555-0102', status: 'Active', source: 'LinkedIn', createdAt: '2023-02-20', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '3', name: 'NatureFirst Inc.', contactPerson: 'Carol Woods', email: 'carol@naturefirst.com', phone: '555-0103', status: 'From Lead', source: 'Cold Call', createdAt: '2023-08-01', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '4', name: 'Sustainable Structures', contactPerson: 'David Stone', email: 'david@sustain.com', phone: '555-0104', status: 'Inactive', source: 'Website', createdAt: '2022-11-30', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '5', name: 'TechFlow Systems', contactPerson: 'Sarah Jenkins', email: 'sarah@techflow.com', phone: '555-0105', status: 'Active', source: 'Email Campaign', createdAt: '2023-09-15', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '6', name: 'GrowthWorks', contactPerson: 'Mike Ross', email: 'mike@growthworks.com', phone: '555-0106', status: 'From Lead', source: 'Referral', createdAt: '2023-10-05', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '7', name: 'SafeGuard', contactPerson: 'Emily Blunt', email: 'emily@safeguard.com', phone: '555-0107', status: 'From Lead', source: 'Exhibition', createdAt: '2023-11-01', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '8', name: 'FastTrack Logistics', contactPerson: 'Tom Speed', email: 'tom@fasttrack.com', phone: '555-0108', status: 'Active', source: 'LinkedIn', createdAt: '2023-07-22', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '9', name: 'BlueSky Innovations', contactPerson: 'Jessica Sky', email: 'jessica@bluesky.com', phone: '555-0109', status: 'Inactive', source: 'Other', createdAt: '2023-01-10', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
+  { id: '10', name: 'Urban Developers', contactPerson: 'Gary Steel', email: 'gary@urban.com', phone: '555-0110', status: 'Active', source: 'Website', createdAt: '2023-06-18', createdById: 'system_user', salespersonId: 'system_user', salespersonName: 'System User', originalSalespersonId: 'system_user', originalSalespersonName: 'System User' },
 ];
 
 const INITIAL_PROJECTS: Project[] = [
@@ -273,7 +273,18 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
 
     const unsubscribeCustomers = onSnapshot(crmSub('crm_customers'), (snapshot) => {
-      setCustomers(snapshot.docs.map(d => ({ id: d.id, ...(d.data() as Customer) })));
+      const normalized = snapshot.docs.map(d => {
+        const raw = { id: d.id, ...(d.data() as Customer) };
+        const salespersonId = raw.salespersonId || raw.createdById || 'unknown';
+        return {
+          ...raw,
+          salespersonId,
+          salespersonName: raw.salespersonName || 'Unknown',
+          originalSalespersonId: raw.originalSalespersonId || salespersonId,
+          originalSalespersonName: raw.originalSalespersonName || raw.salespersonName || 'Unknown'
+        };
+      });
+      setCustomers(normalized);
     }, (error) => {
       console.error('Error in customers listener:', error);
     });
@@ -465,19 +476,45 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const addCustomer = async (customer: Customer) => {
+    const salespersonId = customer.salespersonId || customer.createdById || currentUser?.id || 'unknown';
+    const salespersonUser = users.find(u => u.id === salespersonId);
+    const salespersonName = customer.salespersonName || salespersonUser?.name || 'Unknown';
+    const originalSalespersonId = customer.originalSalespersonId || salespersonId;
+    const originalSalespersonName = customer.originalSalespersonName || salespersonName;
+
     const newCustomer: Customer = {
       ...customer,
-      createdById: currentUser?.id || 'unknown'
+      createdById: customer.createdById || currentUser?.id || 'unknown',
+      salespersonId,
+      salespersonName,
+      originalSalespersonId,
+      originalSalespersonName
     };
     setCustomers(prev => [newCustomer, ...prev]);
     await setDoc(doc(crmSub('crm_customers'), newCustomer.id), newCustomer);
   };
 
   const updateCustomer = async (id: string, data: Partial<Customer>) => {
+    const currentCustomer = customers.find(c => c.id === id);
+    const updatedData: Partial<Customer> = { ...data };
+
+    if (data.salespersonId) {
+      const salespersonUser = users.find(u => u.id === data.salespersonId);
+      updatedData.salespersonName = data.salespersonName || salespersonUser?.name || 'Unknown';
+      if (currentCustomer && currentCustomer.salespersonId !== data.salespersonId) {
+        updatedData.lastReassignedAt = new Date().toISOString();
+      }
+    }
+
+    if (currentCustomer && !currentCustomer.originalSalespersonId) {
+      updatedData.originalSalespersonId = currentCustomer.salespersonId || currentCustomer.createdById || updatedData.salespersonId;
+      updatedData.originalSalespersonName = currentCustomer.salespersonName || updatedData.salespersonName || 'Unknown';
+    }
+
     setCustomers(prev => prev.map(customer => 
-      customer.id === id ? { ...customer, ...data } : customer
+      customer.id === id ? { ...customer, ...updatedData } : customer
     ));
-    await updateDoc(doc(crmSub('crm_customers'), id), data);
+    await updateDoc(doc(crmSub('crm_customers'), id), updatedData);
   };
 
   const deleteCustomer = async (id: string) => {

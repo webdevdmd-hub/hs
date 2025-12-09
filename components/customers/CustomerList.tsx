@@ -6,7 +6,7 @@ import Modal from '../ui/Modal';
 import { useAuth } from '../../hooks/useAuth';
 import { useCRM } from '../../hooks/useCRM';
 import { Customer, Permission } from '../../types';
-import { MoreVerticalIcon, EditIcon, TrashIcon, XIcon, CalendarIcon, CurrencyIcon, CheckCircleIcon, ContactIcon } from '../icons/Icons';
+import { MoreVerticalIcon, EditIcon, TrashIcon, XIcon, CalendarIcon, CurrencyIcon, CheckCircleIcon, ContactIcon, UsersIcon } from '../icons/Icons';
 
 const CustomerList: React.FC = () => {
     const { hasPermission, currentUser, users } = useAuth();
@@ -20,8 +20,20 @@ const CustomerList: React.FC = () => {
         email: '',
         phone: '',
         status: 'Active' as Customer['status'],
-        source: ''
+        source: '',
+        salespersonId: ''
     });
+
+    const salespeople = useMemo(
+        () => users.filter(u => u.isActive && u.roleId === 'sales_executive'),
+        [users]
+    );
+
+    const getCustomerOwnerId = (customer: Customer) => customer.salespersonId || customer.createdById;
+    const getCustomerOwnerName = (customer: Customer) =>
+        customer.salespersonName ||
+        users.find(u => u.id === getCustomerOwnerId(customer))?.name ||
+        'Unknown';
 
     // Check if user is manager or admin (can see all customers)
     const isManagerOrAdmin = currentUser?.roleId === 'admin' || currentUser?.roleId === 'sales_manager';
@@ -32,15 +44,15 @@ const CustomerList: React.FC = () => {
     const filteredCustomers = useMemo(() => {
         let list = customers;
         if (!isManagerOrAdmin) {
-            list = customers.filter(customer => customer.createdById === currentUser?.id);
+            list = customers.filter(customer => getCustomerOwnerId(customer) === currentUser?.id);
         } else if (userFilter !== 'all') {
-            list = customers.filter(customer => customer.createdById === userFilter);
+            list = customers.filter(customer => getCustomerOwnerId(customer) === userFilter);
         }
 
         const sorted = [...list].sort((a, b) => {
             if (sortOption === 'owner') {
-                const aOwner = users.find(u => u.id === a.createdById)?.name || '';
-                const bOwner = users.find(u => u.id === b.createdById)?.name || '';
+                const aOwner = getCustomerOwnerName(a);
+                const bOwner = getCustomerOwnerName(b);
                 return aOwner.localeCompare(bOwner);
             }
             return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
@@ -64,6 +76,11 @@ const CustomerList: React.FC = () => {
     // Customer Detail View State
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
+    // Salesperson reassignment
+    const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
+    const [customerToReassign, setCustomerToReassign] = useState<Customer | null>(null);
+    const [reassignSalespersonId, setReassignSalespersonId] = useState<string>('');
+
     const handleOpenModal = () => {
         setEditingCustomer(null);
         setFormData({
@@ -72,7 +89,8 @@ const CustomerList: React.FC = () => {
             email: '',
             phone: '',
             status: 'Active',
-            source: ''
+            source: '',
+            salespersonId: currentUser?.roleId === 'sales_executive' ? currentUser.id : (salespeople[0]?.id || '')
         });
         setIsModalOpen(true);
         setActiveMenuId(null);
@@ -86,7 +104,8 @@ const CustomerList: React.FC = () => {
             email: customer.email,
             phone: customer.phone,
             status: customer.status,
-            source: customer.source || ''
+            source: customer.source || '',
+            salespersonId: getCustomerOwnerId(customer)
         });
         setIsModalOpen(true);
         setActiveMenuId(null);
@@ -106,8 +125,36 @@ const CustomerList: React.FC = () => {
         }
     };
 
+    const handleOpenReassignModal = (customer: Customer) => {
+        setCustomerToReassign(customer);
+        setReassignSalespersonId(getCustomerOwnerId(customer));
+        setIsReassignModalOpen(true);
+        setActiveMenuId(null);
+    };
+
+    const handleReassignSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!customerToReassign || !reassignSalespersonId) {
+            return;
+        }
+        const salespersonUser = salespeople.find(u => u.id === reassignSalespersonId) || users.find(u => u.id === reassignSalespersonId);
+        await updateCustomer(customerToReassign.id, {
+            salespersonId: reassignSalespersonId,
+            salespersonName: salespersonUser?.name || 'Unknown'
+        });
+        setIsReassignModalOpen(false);
+        setCustomerToReassign(null);
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const salespersonId = formData.salespersonId || (editingCustomer ? getCustomerOwnerId(editingCustomer) : '');
+        if (!salespersonId) {
+            alert('Please select a salesperson owner.');
+            return;
+        }
+        const salespersonUser = salespeople.find(u => u.id === salespersonId) || users.find(u => u.id === salespersonId);
+
         if (editingCustomer) {
             updateCustomer(editingCustomer.id, {
                 name: formData.name,
@@ -115,7 +162,9 @@ const CustomerList: React.FC = () => {
                 email: formData.email,
                 phone: formData.phone,
                 status: formData.status,
-                source: formData.source
+                source: formData.source,
+                salespersonId,
+                salespersonName: salespersonUser?.name || 'Unknown'
             });
         } else {
             const newCustomer: Customer = {
@@ -127,7 +176,11 @@ const CustomerList: React.FC = () => {
                 status: formData.status,
                 source: formData.source,
                 createdAt: new Date().toISOString(),
-                createdById: currentUser?.id || 'system'
+                createdById: currentUser?.id || 'system',
+                salespersonId,
+                salespersonName: salespersonUser?.name || 'Unknown',
+                originalSalespersonId: salespersonId,
+                originalSalespersonName: salespersonUser?.name || 'Unknown'
             };
             addCustomer(newCustomer);
         }
@@ -231,6 +284,7 @@ const CustomerList: React.FC = () => {
                     <th scope="col" className="px-6 py-4 font-semibold">Customer Name</th>
                     <th scope="col" className="px-6 py-4 font-semibold">Contact Person</th>
                     <th scope="col" className="px-6 py-4 font-semibold">Source</th>
+                    <th scope="col" className="px-6 py-4 font-semibold">Salesperson</th>
                     <th scope="col" className="px-6 py-4 font-semibold">Email</th>
                     <th scope="col" className="px-6 py-4 font-semibold">Status</th>
                     <th scope="col" className="px-6 py-4 font-semibold text-right">Actions</th>
@@ -246,6 +300,7 @@ const CustomerList: React.FC = () => {
                         <td className="px-6 py-4 font-medium text-slate-900">{customer.name}</td>
                         <td className="px-6 py-4">{customer.contactPerson}</td>
                         <td className="px-6 py-4">{customer.source || 'N/A'}</td>
+                        <td className="px-6 py-4">{getCustomerOwnerName(customer)}</td>
                         <td className="px-6 py-4">{customer.email}</td>
                         <td className="px-6 py-4">
                             <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${getStatusClass(customer.status)}`}>
@@ -272,6 +327,14 @@ const CustomerList: React.FC = () => {
                                             <EditIcon className="w-4 h-4 mr-2 text-slate-400" /> Edit
                                         </button>
                                     )}
+                                    {hasPermission(Permission.EDIT_CUSTOMERS) && (
+                                        <button
+                                            onClick={() => handleOpenReassignModal(customer)}
+                                            className="w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 flex items-center transition-colors"
+                                        >
+                                            <UsersIcon className="w-4 h-4 mr-2 text-slate-400" /> Reassign
+                                        </button>
+                                    )}
                                     {hasPermission(Permission.DELETE_CUSTOMERS) && (
                                         <button
                                             onClick={() => handleDeleteClick(customer.id)}
@@ -287,7 +350,7 @@ const CustomerList: React.FC = () => {
                     ))}
                     {filteredCustomers.length === 0 && (
                         <tr>
-                            <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                            <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                                 No customers found.
                             </td>
                         </tr>
@@ -384,6 +447,27 @@ const CustomerList: React.FC = () => {
                     </div>
                 </div>
 
+                <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Salesperson Owner</label>
+                    <select
+                        required
+                        value={formData.salespersonId}
+                        onChange={(e) => setFormData({ ...formData, salespersonId: e.target.value })}
+                        disabled={!!editingCustomer}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none invalid:text-slate-400 disabled:opacity-70"
+                    >
+                        <option value="" disabled>Select Salesperson</option>
+                        {salespeople.map(user => (
+                            <option key={user.id} value={user.id}>{user.name}</option>
+                        ))}
+                    </select>
+                    {editingCustomer && (
+                        <p className="text-xs text-slate-500 mt-1">
+                            Use "Reassign" to move this customer to another salesperson.
+                        </p>
+                    )}
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-4">
                     <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
                     <Button type="submit">{editingCustomer ? 'Save Changes' : 'Create Customer'}</Button>
@@ -419,6 +503,39 @@ const CustomerList: React.FC = () => {
                     </Button>
                 </div>
             </div>
+        </Modal>
+
+        {/* Salesperson Reassignment Modal */}
+        <Modal
+            isOpen={isReassignModalOpen}
+            onClose={() => { setIsReassignModalOpen(false); setCustomerToReassign(null); setReassignSalespersonId(''); }}
+            title="Reassign Salesperson"
+        >
+            <form onSubmit={handleReassignSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Assign to Salesperson</label>
+                    <select
+                        required
+                        value={reassignSalespersonId}
+                        onChange={(e) => setReassignSalespersonId(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none invalid:text-slate-400"
+                    >
+                        <option value="" disabled>Select Salesperson</option>
+                        {salespeople.map(user => (
+                            <option key={user.id} value={user.id}>{user.name}</option>
+                        ))}
+                    </select>
+                </div>
+                <p className="text-sm text-slate-500">
+                    The original salesperson will stay recorded, and ownership will move instantly to the new salesperson.
+                </p>
+                <div className="flex justify-end space-x-3 pt-2">
+                    <Button type="button" variant="ghost" onClick={() => { setIsReassignModalOpen(false); setCustomerToReassign(null); setReassignSalespersonId(''); }}>
+                        Cancel
+                    </Button>
+                    <Button type="submit">Reassign</Button>
+                </div>
+            </form>
         </Modal>
 
         {/* Customer Detail View */}
@@ -567,6 +684,14 @@ const CustomerList: React.FC = () => {
                                             <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                                 <span className="text-sm text-slate-500">Source</span>
                                                 <span className="font-medium text-slate-900">{selectedCustomer.source || 'N/A'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                                <span className="text-sm text-slate-500">Salesperson</span>
+                                                <span className="font-medium text-slate-900">{getCustomerOwnerName(selectedCustomer)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+                                                <span className="text-sm text-slate-500">Original Salesperson</span>
+                                                <span className="font-medium text-slate-900">{selectedCustomer.originalSalespersonName || getCustomerOwnerName(selectedCustomer)}</span>
                                             </div>
                                             <div className="flex justify-between items-center py-2 border-b border-slate-100">
                                                 <span className="text-sm text-slate-500">Customer Since</span>

@@ -16,6 +16,9 @@ const SalesReports: React.FC = () => {
     // Check if user is manager or admin (can see all data)
     const isManagerOrAdmin = currentUser?.roleId === 'admin' || currentUser?.roleId === 'sales_manager';
 
+    const getCustomerOwnerId = (customer: { salespersonId?: string; createdById: string }) =>
+        customer.salespersonId || customer.createdById;
+
     // Get selected user name for display
     const selectedUserName = useMemo(() => {
         if (selectedUserId === 'all') return 'All Users';
@@ -48,10 +51,10 @@ const SalesReports: React.FC = () => {
 
     const filteredCustomers = useMemo(() => {
         if (!isManagerOrAdmin) {
-            return customers.filter(customer => customer.createdById === currentUser?.id);
+            return customers.filter(customer => getCustomerOwnerId(customer) === currentUser?.id);
         }
         if (selectedUserId === 'all') return customers;
-        return customers.filter(customer => customer.createdById === selectedUserId);
+        return customers.filter(customer => getCustomerOwnerId(customer) === selectedUserId);
     }, [customers, currentUser?.id, isManagerOrAdmin, selectedUserId]);
 
     // Calculate lead metrics

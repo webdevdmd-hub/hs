@@ -65,8 +65,13 @@ const SalesLeads: React.FC = () => {
       contactPerson: '',
       email: '',
       phone: '',
-      source: ''
+      source: '',
+      salespersonId: ''
   });
+  const salespeople = useMemo(
+    () => users.filter(u => u.isActive && u.roleId === 'sales_executive'),
+    [users]
+  );
 
   // Quotation Request Modal State
   const [isQuotationRequestModalOpen, setIsQuotationRequestModalOpen] = useState(false);
@@ -203,6 +208,10 @@ const SalesLeads: React.FC = () => {
       e.preventDefault();
       if (!selectedLead) return;
 
+      const salespersonId = convertFormData.salespersonId || selectedLead.assignedTo || currentUser?.id || 'system';
+      const salespersonUser = salespeople.find(u => u.id === salespersonId) || users.find(u => u.id === salespersonId);
+      const salespersonName = salespersonUser?.name || 'Unknown';
+
       const newCustomer: Customer = {
           id: Date.now().toString(),
           name: convertFormData.name,
@@ -212,7 +221,11 @@ const SalesLeads: React.FC = () => {
           status: 'From Lead',
           source: convertFormData.source || 'Converted',
           createdAt: new Date().toISOString(),
-          createdById: currentUser?.id || 'system'
+          createdById: currentUser?.id || 'system',
+          salespersonId,
+          salespersonName,
+          originalSalespersonId: salespersonId,
+          originalSalespersonName: salespersonName
       };
 
       await addCustomer(newCustomer);
@@ -236,13 +249,19 @@ const SalesLeads: React.FC = () => {
   // Direct Convert to Customer handler (from lead details)
   const handleOpenConvertModal = () => {
     if (!selectedLead) return;
+    const defaultSalespersonId =
+      salespeople.find(u => u.id === selectedLead.assignedTo)?.id ||
+      (currentUser?.roleId === 'sales_executive' ? currentUser.id : '') ||
+      salespeople[0]?.id ||
+      '';
     // Auto-fill ALL fields from lead
     setConvertFormData({
       name: selectedLead.customerName,
       contactPerson: selectedLead.customerName, // Auto-fill with customer name
       email: selectedLead.email || '',
       phone: selectedLead.phone || '',
-      source: selectedLead.source || 'Converted'
+      source: selectedLead.source || 'Converted',
+      salespersonId: defaultSalespersonId
     });
     setIsConvertModalOpen(true);
   };
@@ -1079,6 +1098,21 @@ const SalesLeads: React.FC = () => {
                         placeholder="+1 (555) 000-0000"
                     />
                 </div>
+            </div>
+            <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5 uppercase">Salesperson Owner</label>
+                <select
+                    required
+                    value={convertFormData.salespersonId}
+                    onChange={(e) => setConvertFormData({ ...convertFormData, salespersonId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-emerald-500 focus:border-emerald-500 outline-none invalid:text-slate-400"
+                >
+                    <option value="" disabled>Select Salesperson</option>
+                    {salespeople.map(user => (
+                        <option key={user.id} value={user.id}>{user.name}</option>
+                    ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Only active Salesperson role users are listed.</p>
             </div>
             <div className="flex justify-end space-x-3 pt-4">
                 <Button type="button" variant="ghost" onClick={() => setIsConvertModalOpen(false)}>Cancel</Button>
