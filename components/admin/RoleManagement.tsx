@@ -7,6 +7,17 @@ import { useAuth } from '../../hooks/useAuth';
 import { Permission } from '../../types';
 import { TrashIcon, ChevronDownIcon } from '../icons/Icons';
 
+const SUPER_ADMIN_ROLE_ID = 'admin';
+const SYSTEM_ROLE_IDS = [
+    SUPER_ADMIN_ROLE_ID,
+    'sales_manager',
+    'assistant_sales_manager',
+    'sales_executive',
+    'sales_coordinator',
+    'sales_coordination_head',
+    'accountant_head'
+];
+
 const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
     {
         label: 'User Management',
@@ -117,7 +128,8 @@ const RoleManagement: React.FC = () => {
             await updateRolePermissions(roleId, permission, checked);
         } catch (error) {
             console.error('Failed to update permission:', error);
-            setError('Failed to update permission. Please try again.');
+            const message = error instanceof Error ? error.message : 'Failed to update permission. Please try again.';
+            setError(message);
         }
     };
 
@@ -156,7 +168,7 @@ const RoleManagement: React.FC = () => {
     };
 
     const isSystemRole = (roleId: string) => {
-        return ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'accountant_head'].includes(roleId);
+        return SYSTEM_ROLE_IDS.includes(roleId);
     };
 
     const selectedRole = roles.find(r => r.id === selectedRoleId) || null;
@@ -263,6 +275,11 @@ const RoleManagement: React.FC = () => {
             >
                 {selectedRole && (
                     <div className="space-y-4">
+                        {selectedRole.id === SUPER_ADMIN_ROLE_ID && (
+                            <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-xs font-medium">
+                                Super Admin permissions are fixed and always include every capability. They cannot be edited or removed.
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                             {PERMISSION_GROUPS.map(group => (
                                 <div key={group.label} className="rounded-lg border border-slate-100 bg-white p-3 shadow-sm">
@@ -273,13 +290,13 @@ const RoleManagement: React.FC = () => {
                                         {group.permissions.map(permission => (
                                             <label
                                                 key={permission}
-                                                className={`flex items-center space-x-2 text-xs text-slate-600 select-none ${!hasPermission(Permission.MANAGE_ROLES) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-emerald-700'}`}
+                                                className={`flex items-center space-x-2 text-xs text-slate-600 select-none ${(selectedRole.id === SUPER_ADMIN_ROLE_ID) || !hasPermission(Permission.MANAGE_ROLES) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:text-emerald-700'}`}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50 w-4 h-4"
                                                     checked={selectedRole.permissions.includes(permission)}
-                                                    disabled={!hasPermission(Permission.MANAGE_ROLES)}
+                                                    disabled={selectedRole.id === SUPER_ADMIN_ROLE_ID || !hasPermission(Permission.MANAGE_ROLES)}
                                                     onChange={(e) => handlePermissionChange(selectedRole.id, permission, e.target.checked)}
                                                 />
                                                 <span>{permission.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</span>

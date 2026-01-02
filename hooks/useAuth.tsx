@@ -25,9 +25,20 @@ import { httpsCallable } from 'firebase/functions';
 
 // --- MOCK ROLES (Keeping roles hardcoded for simplicity, but permissions could also be in DB) ---
 const ALL_PERMISSIONS = Object.values(Permission);
+const SUPER_ADMIN_ROLE_ID = 'admin';
+const SUPER_ADMIN_ROLE: Role = { id: SUPER_ADMIN_ROLE_ID, name: 'Admin', permissions: ALL_PERMISSIONS };
+const SYSTEM_ROLE_IDS = [
+  SUPER_ADMIN_ROLE_ID,
+  'sales_manager',
+  'assistant_sales_manager',
+  'sales_executive',
+  'sales_coordinator',
+  'sales_coordination_head',
+  'accountant_head'
+];
 
 const MOCK_ROLES: Role[] = [
-  { id: 'admin', name: 'Admin', permissions: ALL_PERMISSIONS },
+  SUPER_ADMIN_ROLE,
   { id: 'sales_manager', name: 'Sales Manager', permissions: [
     Permission.VIEW_SALES_DASHBOARD,
     // Full Lead Access
@@ -178,6 +189,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [roles, setRoles] = useState<Role[]>(MOCK_ROLES);
   const [loading, setLoading] = useState(true);
 
+  // Ensure Super Admin is always present locally and in Firestore
+  const enforceSuperAdminRole = useCallback(async (existingRole?: Role) => {
+    const roleRef = doc(db, "roles", SUPER_ADMIN_ROLE_ID);
+    const isMissing = !existingRole;
+    const hasAllPermissions = existingRole?.permissions?.length === ALL_PERMISSIONS.length &&
+      ALL_PERMISSIONS.every(p => existingRole.permissions.includes(p));
+    const nameMismatch = existingRole?.name !== SUPER_ADMIN_ROLE.name;
+
+    if (isMissing || !hasAllPermissions || nameMismatch) {
+      await setDoc(roleRef, {
+        name: SUPER_ADMIN_ROLE.name,
+        permissions: SUPER_ADMIN_ROLE.permissions,
+        isSystem: true
+      }, { merge: true });
+    }
+  }, []);
+
+  const normalizeRolesWithSuperAdmin = useCallback((roleList: Role[]) => {
+    const updated = [...roleList];
+    const existingIndex = updated.findIndex(r => r.id === SUPER_ADMIN_ROLE_ID);
+
+    if (existingIndex >= 0) {
+      updated[existingIndex] = { ...updated[existingIndex], ...SUPER_ADMIN_ROLE };
+    } else {
+      updated.unshift(SUPER_ADMIN_ROLE);
+    }
+
+    return updated;
+  }, []);
+
   // Sync Auth State with Real-time Firestore Profile Listener
   useEffect(() => {
     let unsubscribeFirestore: (() => void) | undefined;
@@ -320,7 +361,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await setDoc(doc(db, "roles", role.id), {
                   name: role.name,
                   permissions: role.permissions,
-                  isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'sales_coordination_head', 'accountant_head'].includes(role.id)
+                  isSystem: SYSTEM_ROLE_IDS.includes(role.id)
                 });
               }
               console.log("Default roles seeded successfully");
@@ -350,14 +391,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             // Only update if we have roles, otherwise keep current/default
             if (fetchedRoles.length > 0) {
-              setRoles(fetchedRoles);
+              const syncedRoles = normalizeRolesWithSuperAdmin(fetchedRoles);
+              const superAdminFromDb = fetchedRoles.find(r => r.id === SUPER_ADMIN_ROLE_ID);
+              setRoles(syncedRoles);
+              enforceSuperAdminRole(superAdminFromDb).catch((err) => {
+                console.error("Error enforcing Super Admin role:", err);
+              });
             } else {
               console.warn("No valid roles found in Firestore, using defaults");
               setRoles(MOCK_ROLES);
+              enforceSuperAdminRole().catch((err) => {
+                console.error("Error enforcing Super Admin role:", err);
+              });
             }
           } catch (err) {
             console.error("Error processing roles snapshot:", err);
             setRoles(MOCK_ROLES);
+            enforceSuperAdminRole().catch((error) => {
+              console.error("Error enforcing Super Admin role:", error);
+            });
           }
         }
       },
@@ -365,11 +417,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("Error listening to roles collection:", error);
         // Fallback to MOCK_ROLES on error
         setRoles(MOCK_ROLES);
+        enforceSuperAdminRole().catch((err) => {
+          console.error("Error enforcing Super Admin role:", err);
+        });
       }
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [enforceSuperAdminRole, normalizeRolesWithSuperAdmin]);
 
   const userRole = useMemo(() => {
     if (!currentUser) return null;
@@ -529,7 +584,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const hasPermission = useCallback((permission: Permission): boolean => {
-    if (currentUser?.roleId === 'admin') {
+    if (currentUser?.roleId === SUPER_ADMIN_ROLE_ID) {
       return true;
     }
     return userRole?.permissions.includes(permission) ?? false;
@@ -544,6 +599,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const updateRolePermissions = async (roleId: string, permission: Permission, granted: boolean) => {
+    if (roleId === SUPER_ADMIN_ROLE_ID) {
+      throw new Error('Super Admin permissions are locked and cannot be edited.');
+    }
+
     // Find current role to get updated permissions
     const currentRole = roles.find(r => r.id === roleId);
     if (!currentRole) {
@@ -569,7 +628,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await setDoc(roleRef, {
         name: currentRole.name,
         permissions: uniquePermissions,
-        isSystem: ['admin', 'sales_manager', 'assistant_sales_manager', 'sales_executive', 'sales_coordinator', 'sales_coordination_head', 'accountant_head'].includes(roleId)
+        isSystem: SYSTEM_ROLE_IDS.includes(roleId)
       }, { merge: true });
 
       // Real-time listener will sync any discrepancies
@@ -604,6 +663,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const deleteRole = async (roleId: string) => {
+    if (roleId === SUPER_ADMIN_ROLE_ID) {
+      throw new Error('Super Admin role cannot be deleted.');
+    }
+
     // Store the role for potential rollback
     const roleToDelete = roles.find(r => r.id === roleId);
 
