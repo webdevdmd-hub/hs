@@ -337,6 +337,7 @@ export interface Project {
   value: number;
   description?: string;
   progress: number; // 0-100
+  createdAt?: string;
   createdById?: string;
   createdByName?: string;
 }

@@ -529,8 +529,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
   
   const hasPermission = useCallback((permission: Permission): boolean => {
+    if (currentUser?.roleId === 'admin') {
+      return true;
+    }
     return userRole?.permissions.includes(permission) ?? false;
-  }, [userRole]);
+  }, [currentUser?.roleId, userRole]);
 
   const getRoleForUser = useCallback((user: User): Role | undefined => {
     return roles.find(role => role.id === user.roleId);

@@ -6,7 +6,7 @@ import {
   Notification
 } from '../types';
 import { useAuth } from './useAuth';
-import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, CollectionReference } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // Initial Mock Data
@@ -72,9 +72,9 @@ const INITIAL_CUSTOMERS: Customer[] = [
 ];
 
 const INITIAL_PROJECTS: Project[] = [
-    { id: 'p1', title: 'HQ Renovation', customerId: '1', customerName: 'GreenScape Solutions', status: 'In Progress', startDate: '2023-11-01', dueDate: '2024-02-28', value: 150000, progress: 35, description: 'Full renovation of the main office block.' },
-    { id: 'p2', title: 'Material Supply Phase 1', customerId: '2', customerName: 'EcoBuild Corp', status: 'Not Started', startDate: '2023-12-01', dueDate: '2024-01-15', value: 45000, progress: 0, description: 'Supply of sustainable insulation materials.' },
-    { id: 'p3', title: 'Logistics Fleet Setup', customerId: '8', customerName: 'FastTrack Logistics', status: 'Completed', startDate: '2023-08-01', dueDate: '2023-10-30', value: 200000, progress: 100, description: 'Acquisition and branding of 10 delivery trucks.' },
+    { id: 'p1', title: 'HQ Renovation', customerId: '1', customerName: 'GreenScape Solutions', status: 'In Progress', startDate: '2023-11-01', dueDate: '2024-02-28', value: 150000, progress: 35, description: 'Full renovation of the main office block.', createdAt: '2023-10-15', createdById: 'system_user', createdByName: 'System User' },
+    { id: 'p2', title: 'Material Supply Phase 1', customerId: '2', customerName: 'EcoBuild Corp', status: 'Not Started', startDate: '2023-12-01', dueDate: '2024-01-15', value: 45000, progress: 0, description: 'Supply of sustainable insulation materials.', createdAt: '2023-10-20', createdById: 'system_user', createdByName: 'System User' },
+    { id: 'p3', title: 'Logistics Fleet Setup', customerId: '8', customerName: 'FastTrack Logistics', status: 'Completed', startDate: '2023-08-01', dueDate: '2023-10-30', value: 200000, progress: 100, description: 'Acquisition and branding of 10 delivery trucks.', createdAt: '2023-07-15', createdById: 'system_user', createdByName: 'System User' },
 ];
 
 const INITIAL_TASKS: Task[] = [
@@ -194,8 +194,16 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [userSchedules, setUserSchedules] = useState<UserSchedule[]>([]);
 
   const isAdmin = useMemo(() => currentUser?.roleId === 'admin', [currentUser]);
+  const canAssignTasks = useMemo(() => {
+    const roleId = currentUser?.roleId;
+    return roleId === 'admin' ||
+      roleId === 'sales_manager' ||
+      roleId === 'assistant_sales_manager' ||
+      roleId === 'sales_coordination_head' ||
+      roleId === 'sales_coordinator';
+  }, [currentUser?.roleId]);
 
-  // Role-based task filtering: Admins see all tasks, others see only assigned tasks
+  // Role-based task filtering: admins see all, assigners also see unassigned tasks.
   const filteredTasks = useMemo(() => {
     if (!currentUser) return [];
 
@@ -203,9 +211,14 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return tasks; // Admins see all tasks
     }
 
+    // Users who can assign tasks should also see unassigned tasks.
+    if (canAssignTasks) {
+      return tasks.filter(task => task.assignedTo === currentUser.id || !task.assignedTo);
+    }
+
     // Other users see only tasks assigned to them
     return tasks.filter(task => task.assignedTo === currentUser.id);
-  }, [tasks, currentUser, isAdmin]);
+  }, [tasks, currentUser, isAdmin, canAssignTasks]);
 
   const CRM_MAIN_DOC = 'main';
   const crmSub = (name: string) => collection(db, 'crm', CRM_MAIN_DOC, name);
@@ -605,6 +618,7 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         ...project,
         createdById: project.createdById || currentUser?.id || 'system_user',
         createdByName: project.createdByName || currentUser?.name || 'System',
+        createdAt: project.createdAt || new Date().toISOString(),
       };
       setProjects(prev => [projectWithOwner, ...prev]);
       await setDoc(doc(crmSub('crm_projects'), projectWithOwner.id), projectWithOwner);
@@ -1051,20 +1065,23 @@ export const CRMProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const saveUserSchedule = async (schedule: Omit<UserSchedule, 'id' | 'updatedAt'>) => {
     const existingSchedule = userSchedules.find(s => s.userId === schedule.userId);
+    const userSchedulesCollection = collection(db, 'user_schedules') as CollectionReference<UserSchedule>;
     const scheduleData: UserSchedule = {
       id: existingSchedule?.id || schedule.userId,
       ...schedule,
       updatedAt: new Date().toISOString(),
     };
 
+    const scheduleDocRef = doc(userSchedulesCollection, scheduleData.id);
+
     if (existingSchedule) {
       setUserSchedules(prev => prev.map(s =>
         s.userId === schedule.userId ? scheduleData : s
       ));
-      await updateDoc(doc(collection(db, 'user_schedules'), scheduleData.id), scheduleData);
+      await setDoc(scheduleDocRef, scheduleData, { merge: true });
     } else {
       setUserSchedules(prev => [scheduleData, ...prev]);
-      await setDoc(doc(collection(db, 'user_schedules'), scheduleData.id), scheduleData);
+      await setDoc(scheduleDocRef, scheduleData);
     }
   };
 
