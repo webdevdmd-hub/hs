@@ -4,15 +4,21 @@ import { getAuth } from 'firebase/auth';
 import { getFunctions } from 'firebase/functions';
 import { getMessaging, isSupported } from 'firebase/messaging';
 
-// IMPORTANT: Replace with your actual Firebase project configuration
-// You can find this in your project's settings on the Firebase console.
+const getEnv = (key: keyof ImportMetaEnv) => {
+  const value = import.meta.env[key];
+  if (!value) {
+    throw new Error(`Missing required env var: ${key}`);
+  }
+  return value;
+};
+
 export const firebaseConfig = {
-  apiKey: "AIzaSyApbQHymJkakiKyfYHYHmf9D7e_818SVVc",
-  authDomain: "dmd-project-7d5bc.firebaseapp.com",
-  projectId: "dmd-project-7d5bc",
-  storageBucket: "dmd-project-7d5bc.appspot.com",
-  messagingSenderId: "752938708459",
-  appId: "1:752938708459:web:7afe66d7c91de32b30bdae"
+  apiKey: getEnv('VITE_FIREBASE_API_KEY'),
+  authDomain: getEnv('VITE_FIREBASE_AUTH_DOMAIN'),
+  projectId: getEnv('VITE_FIREBASE_PROJECT_ID'),
+  storageBucket: getEnv('VITE_FIREBASE_STORAGE_BUCKET'),
+  messagingSenderId: getEnv('VITE_FIREBASE_MESSAGING_SENDER_ID'),
+  appId: getEnv('VITE_FIREBASE_APP_ID'),
 };
 
 // Initialize Firebase
@@ -29,12 +35,14 @@ export const functions = getFunctions(app);
 
 // Get Messaging instance (only if supported in browser)
 let messaging: ReturnType<typeof getMessaging> | null = null;
-isSupported().then((supported) => {
-  if (supported) {
-    messaging = getMessaging(app);
-  }
-}).catch((err) => {
-  console.warn('Firebase Messaging not supported:', err);
-});
+isSupported()
+  .then((supported) => {
+    if (supported) {
+      messaging = getMessaging(app);
+    }
+  })
+  .catch((err) => {
+    console.warn('Firebase Messaging not supported:', err);
+  });
 
 export const getMessagingInstance = () => messaging;

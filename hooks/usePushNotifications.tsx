@@ -1,12 +1,10 @@
 import { useEffect, useState } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
 import { doc, setDoc, updateDoc } from 'firebase/firestore';
-import { db, getMessagingInstance } from '../firebase';
+import { db, getMessagingInstance, firebaseConfig } from '../firebase';
 import { useAuth } from './useAuth';
 
-// VAPID key - You need to generate this in Firebase Console
-// Go to Project Settings > Cloud Messaging > Web Push certificates
-const VAPID_KEY = 'YOUR_VAPID_KEY_HERE'; // Replace with your actual VAPID key
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 export const usePushNotifications = () => {
   const { currentUser } = useAuth();
@@ -29,6 +27,11 @@ export const usePushNotifications = () => {
       return null;
     }
 
+    if (!VAPID_KEY) {
+      console.warn('Missing VAPID key. Set VITE_FIREBASE_VAPID_KEY in your environment.');
+      return null;
+    }
+
     try {
       // Request notification permission
       const permission = await Notification.requestPermission();
@@ -47,7 +50,14 @@ export const usePushNotifications = () => {
       console.log('Service Worker registered:', registration);
 
       // Wait for service worker to be ready
-      await navigator.serviceWorker.ready;
+      const readyRegistration = await navigator.serviceWorker.ready;
+
+      // Send Firebase config to service worker to avoid hardcoding secrets there
+      const targetSW = readyRegistration.active || readyRegistration.waiting || readyRegistration.installing;
+      targetSW?.postMessage({
+        type: 'INIT_FIREBASE',
+        firebaseConfig,
+      });
 
       // Get FCM token
       const messaging = getMessagingInstance();

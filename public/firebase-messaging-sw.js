@@ -2,43 +2,60 @@
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
 
-// Initialize Firebase in the service worker
-firebase.initializeApp({
-  apiKey: "AIzaSyApbQHymJkakiKyfYHYHmf9D7e_818SVVc",
-  authDomain: "dmd-project-7d5bc.firebaseapp.com",
-  projectId: "dmd-project-7d5bc",
-  storageBucket: "dmd-project-7d5bc.appspot.com",
-  messagingSenderId: "752938708459",
-  appId: "1:752938708459:web:7afe66d7c91de32b30bdae"
-});
+let messaging = null;
+let firebaseInitialized = false;
 
-// Retrieve an instance of Firebase Messaging
-const messaging = firebase.messaging();
+const initFirebaseIfNeeded = (config) => {
+  if (firebaseInitialized) return;
+  if (!config) {
+    console.warn('Firebase config not provided to messaging service worker.');
+    return;
+  }
 
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
+  firebase.initializeApp(config);
+  firebaseInitialized = true;
 
-  const notificationTitle = payload.notification?.title || 'New Notification';
-  const notificationOptions = {
-    body: payload.notification?.body || '',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
-    data: payload.data,
-    requireInteraction: true,
-    actions: [
-      {
-        action: 'open',
-        title: 'View'
-      },
-      {
-        action: 'close',
-        title: 'Dismiss'
-      }
-    ]
-  };
+  try {
+    messaging = firebase.messaging();
+    attachBackgroundHandler();
+  } catch (err) {
+    console.error('Failed to initialize Firebase messaging in service worker:', err);
+  }
+};
 
-  return self.registration.showNotification(notificationTitle, notificationOptions);
+const attachBackgroundHandler = () => {
+  if (!messaging) return;
+
+  messaging.onBackgroundMessage((payload) => {
+    console.log('[firebase-messaging-sw.js] Received background message ', payload);
+
+    const notificationTitle = payload.notification?.title || 'New Notification';
+    const notificationOptions = {
+      body: payload.notification?.body || '',
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      data: payload.data,
+      requireInteraction: true,
+      actions: [
+        {
+          action: 'open',
+          title: 'View'
+        },
+        {
+          action: 'close',
+          title: 'Dismiss'
+        }
+      ]
+    };
+
+    return self.registration.showNotification(notificationTitle, notificationOptions);
+  });
+};
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'INIT_FIREBASE') {
+    initFirebaseIfNeeded(event.data.firebaseConfig);
+  }
 });
 
 // Handle notification clicks
